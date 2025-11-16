@@ -1,0 +1,444 @@
+// Judging Panel Module - Prisma Schema
+// Real-time judging with WebSocket synchronization
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum JudgingSessionStatus {
+  PENDING      // Waiting to start
+  ACTIVE       // Currently judging
+  PAUSED       // Temporarily paused
+  COMPLETED    // Finished
+  CANCELLED    // Cancelled
+}
+
+enum JudgeRole {
+  D1           // Difficulty judge 1
+  D2           // Difficulty judge 2
+  D3           // Difficulty judge 3 (if applicable)
+  D4           // Difficulty judge 4 (if applicable)
+  E1           // Execution judge 1
+  E2           // Execution judge 2
+  E3           // Execution judge 3
+  E4           // Execution judge 4
+  A1           // Artistic judge 1 (if applicable)
+  A2           // Artistic judge 2 (if applicable)
+  LINE_JUDGE   // Line judge
+  TIME_KEEPER  // Time keeper
+  CHIEF_JUDGE  // Chief judge
+}
+
+enum JudgePanelType {
+  D_PANEL      // Difficulty panel
+  E_PANEL      // Execution panel
+  A_PANEL      // Artistic panel
+  TECHNICAL    // Technical panel
+}
+
+enum ScoreStatus {
+  PENDING      // Not yet submitted
+  SUBMITTED    // Submitted by judge
+  LOCKED       // Locked (cannot edit)
+  REOPENED     // Reopened for editing
+}
+
+enum PerformerStatus {
+  WAITING      // Waiting to perform
+  PERFORMING   // Currently performing
+  COMPLETED    // Performance completed
+  SKIPPED      // Skipped (absent, injury, etc.)
+  DISQUALIFIED // Disqualified
+}
+
+enum RoundType {
+  QUALIFICATION  // Qualification round
+  SEMIFINAL      // Semifinal
+  FINAL          // Final
+  ALL_AROUND     // All-around final
+}
+
+// ============================================================================
+// MAIN ENTITIES
+// ============================================================================
+
+/// Judging session for a group of athletes
+model JudgingSession {
+  id          String   @id @default(cuid())
+
+  // Competition and group reference
+  competitionId String
+  groupId       String?  // Reference to Group from competition module
+  dateId        String?  // Reference to CompetitionDate
+
+  // Session details
+  name          String   @db.VarChar(200)
+  apparatus     String   @db.VarChar(50)  // ROPE, HOOP, BALL, CLUBS, RIBBON, FREEHAND
+  round         RoundType
+  status        JudgingSessionStatus @default(PENDING)
+
+  // Current state
+  currentAthleteIndex Int      @default(0)
+  currentAthleteId    String?
+
+  // Athletes in this session
+  athletes      PerformerInSession[]
+
+  // Judges assigned to this session
+  judges        JudgeAssignment[]
+
+  // All scores for this session
+  scores        Score[]
+
+  // Session control
+  startedAt     DateTime?
+  pausedAt      DateTime?
+  resumedAt     DateTime?
+  completedAt   DateTime?
+
+  // Settings
+  settings      Json?    // Session-specific settings
+  /*
+    {
+      autoAdvance: boolean,
+      requireAllJudges: boolean,
+      lockScoresAfter: number (seconds),
+      allowScoreEdit: boolean,
+      timeLimitPerPerformer: number (seconds)
+    }
+  */
+
+  // Metadata
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  createdBy     String?
+
+  // Audit
+  auditLogs     JudgingAuditLog[]
+
+  @@index([competitionId])
+  @@index([groupId])
+  @@index([status])
+}
+
+/// Performer (athlete) in a judging session
+model PerformerInSession {
+  id          String   @id @default(cuid())
+
+  session     JudgingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String
+
+  // Athlete details (duplicated for performance)
+  athleteId   String   // Reference to GroupAthlete
+  fullName    String   @db.VarChar(200)
+  club        String   @db.VarChar(200)
+  birthDate   DateTime @db.Date
+
+  // Order in session
+  orderNumber Int
+
+  // Status
+  status      PerformerStatus @default(WAITING)
+
+  // Performance timing
+  startedAt   DateTime?
+  completedAt DateTime?
+  duration    Int?     // Actual performance duration in seconds
+
+  // Scores for this performer
+  scores      Score[]
+
+  // Final calculated score
+  finalScore  Decimal? @db.Decimal(5, 3)  // e.g., 35.425
+  dScore      Decimal? @db.Decimal(5, 3)  // Difficulty score
+  eScore      Decimal? @db.Decimal(5, 3)  // Execution score
+  aScore      Decimal? @db.Decimal(5, 3)  // Artistic score (if applicable)
+
+  // Penalties/deductions
+  penalties   Decimal? @db.Decimal(5, 3)
+  penaltyReason String? @db.Text
+
+  // Rank
+  rank        Int?
+
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sessionId, orderNumber])
+  @@index([sessionId, status])
+  @@index([athleteId])
+}
+
+/// Judge assignment to a session
+model JudgeAssignment {
+  id          String   @id @default(cuid())
+
+  session     JudgingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String
+
+  // Judge details
+  judgeId     String   // User ID
+  judgeName   String   @db.VarChar(200)
+  judgeRole   JudgeRole
+  panelType   JudgePanelType
+
+  // Connection status
+  isConnected Boolean  @default(false)
+  lastSeen    DateTime @default(now())
+  connectedAt DateTime?
+  disconnectedAt DateTime?
+
+  // Scores submitted by this judge
+  scores      Score[]
+
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sessionId, judgeRole])
+  @@index([sessionId])
+  @@index([judgeId])
+}
+
+/// Individual score from a judge
+model Score {
+  id          String   @id @default(cuid())
+
+  session     JudgingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String
+
+  performer   PerformerInSession @relation(fields: [performerId], references: [id], onDelete: Cascade)
+  performerId String
+
+  judge       JudgeAssignment @relation(fields: [judgeAssignmentId], references: [id], onDelete: Cascade)
+  judgeAssignmentId String
+
+  // Score details
+  value       Decimal  @db.Decimal(5, 3)  // e.g., 8.500
+  status      ScoreStatus @default(PENDING)
+
+  // Validation
+  isValid     Boolean  @default(true)
+  validationErrors String? @db.Text
+
+  // Versioning for optimistic locking
+  version     Int      @default(1)
+
+  // Timestamps
+  submittedAt DateTime?
+  lockedAt    DateTime?
+  reopenedAt  DateTime?
+  reopenedBy  String?  // User ID who reopened
+
+  // Components (for detailed scoring)
+  components  Json?    // Individual deductions, bonuses, etc.
+  /*
+    {
+      deductions: [
+        { type: "BALANCE", value: 0.1 },
+        { type: "FORM", value: 0.2 }
+      ],
+      bonuses: [
+        { type: "DIFFICULTY", value: 0.5 }
+      ]
+    }
+  */
+
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sessionId, performerId, judgeAssignmentId])
+  @@index([sessionId, performerId])
+  @@index([judgeAssignmentId])
+  @@index([status])
+}
+
+/// Audit log for judging actions
+model JudgingAuditLog {
+  id          String   @id @default(cuid())
+
+  session     JudgingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  sessionId   String
+
+  // Action details
+  action      String   @db.VarChar(100)  // "SCORE_SUBMITTED", "SCORE_REOPENED", "PERFORMER_CHANGED", etc.
+  actorId     String   // User ID who performed action
+  actorName   String   @db.VarChar(200)
+  actorRole   String   @db.VarChar(50)
+
+  // Target
+  targetType  String?  @db.VarChar(50)   // "PERFORMER", "SCORE", "SESSION"
+  targetId    String?
+
+  // Changes
+  previousValue Json?
+  newValue      Json?
+  metadata      Json?  // Additional context
+
+  // Timestamp
+  createdAt   DateTime @default(now())
+
+  // IP and device info
+  ipAddress   String?  @db.VarChar(50)
+  userAgent   String?  @db.VarChar(500)
+
+  @@index([sessionId, createdAt])
+  @@index([actorId])
+  @@index([action])
+}
+
+// ============================================================================
+// SUPPORTING ENTITIES
+// ============================================================================
+
+/// Saved score templates for quick entry
+model ScoreTemplate {
+  id          String   @id @default(cuid())
+
+  judgeId     String   // User ID
+  name        String   @db.VarChar(100)
+  description String?  @db.VarChar(300)
+
+  // Template configuration
+  panelType   JudgePanelType
+  components  Json     // Deduction/bonus presets
+  /*
+    {
+      commonDeductions: [
+        { label: "Small balance", value: 0.1 },
+        { label: "Medium balance", value: 0.3 },
+        { label: "Fall", value: 0.5 }
+      ]
+    }
+  */
+
+  // Usage stats
+  timesUsed   Int      @default(0)
+  lastUsed    DateTime?
+
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([judgeId])
+}
+
+/// Judge preferences and settings
+model JudgePreferences {
+  id          String   @id @default(cuid())
+  judgeId     String   @unique  // User ID
+
+  // Display preferences
+  fontSize    String   @default("medium")  // "small", "medium", "large"
+  theme       String   @default("light")   // "light", "dark"
+  showTimer   Boolean  @default(true)
+  autoAdvance Boolean  @default(false)
+
+  // Scoring preferences
+  defaultDeductions Json?  // Quick-access deductions
+  scoreEntryMode String   @default("keypad")  // "keypad", "slider", "buttons"
+
+  // Notifications
+  soundEnabled Boolean  @default(true)
+  vibrationEnabled Boolean @default(false)
+
+  // Saved templates
+  favoriteTemplates String[]  // Array of ScoreTemplate IDs
+
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([judgeId])
+}
+
+/// Session statistics and metrics
+model SessionStatistics {
+  id          String   @id @default(cuid())
+  sessionId   String   @unique
+
+  // Timing metrics
+  totalDuration Int?   // Total session duration in seconds
+  avgTimePerPerformer Int?  // Average time per performer
+  fastestPerformer Int?  // Fastest performance time
+  slowestPerformer Int?  // Slowest performance time
+
+  // Scoring metrics
+  totalScoresSubmitted Int  @default(0)
+  avgSubmissionTime Int?  // Average time to submit score
+  scoreReopenCount Int   @default(0)
+
+  // Judge metrics
+  totalJudges Int
+  avgJudgesOnline Decimal? @db.Decimal(5, 2)
+  totalReconnections Int  @default(0)
+
+  // Performance metrics
+  totalPerformers Int
+  completedPerformers Int  @default(0)
+  skippedPerformers Int    @default(0)
+
+  // Score statistics
+  highestScore Decimal? @db.Decimal(5, 3)
+  lowestScore Decimal?  @db.Decimal(5, 3)
+  avgScore Decimal?     @db.Decimal(5, 3)
+
+  // Metadata
+  calculatedAt DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([sessionId])
+}
+
+/// Real-time connection tracking
+model JudgeConnection {
+  id          String   @id @default(cuid())
+
+  judgeId     String
+  sessionId   String
+
+  // WebSocket connection info
+  socketId    String   @unique
+  connected   Boolean  @default(true)
+
+  // Connection details
+  connectedAt DateTime @default(now())
+  lastPing    DateTime @default(now())
+  disconnectedAt DateTime?
+
+  // Network info
+  ipAddress   String?  @db.VarChar(50)
+  userAgent   String?  @db.VarChar(500)
+
+  @@index([judgeId, sessionId])
+  @@index([sessionId])
+  @@index([connected])
+}
+
+/// Offline score queue (for network interruptions)
+model OfflineScoreQueue {
+  id          String   @id @default(cuid())
+
+  judgeId     String
+  sessionId   String
+  performerId String
+
+  // Score data
+  scoreValue  Decimal  @db.Decimal(5, 3)
+  components  Json?
+
+  // Queue metadata
+  attemptedAt DateTime @default(now())
+  attempts    Int      @default(0)
+  lastAttempt DateTime @default(now())
+  synced      Boolean  @default(false)
+  syncedAt    DateTime?
+
+  // Error tracking
+  lastError   String?  @db.Text
+
+  @@index([judgeId, synced])
+  @@index([sessionId])
+}
