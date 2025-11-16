@@ -402,6 +402,156 @@ table tbody tr:last-child {
     opacity: 0.3;
 }
 
+/* Новые стили для системы оценивания FIG 2025-2028 */
+
+.info-banner {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    padding: 15px 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    text-align: center;
+    font-size: 16px;
+}
+
+.section-title {
+    color: #f5576c;
+    margin-top: 30px;
+    margin-bottom: 15px;
+    padding: 10px 15px;
+    background: linear-gradient(90deg, #f8f9fa 0%, transparent 100%);
+    border-left: 4px solid #f5576c;
+    border-radius: 4px;
+}
+
+.judge-panel {
+    background: #ffffff;
+    border: 2px solid #e9ecef;
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 20px;
+}
+
+.judge-panel h4 {
+    color: #495057;
+    margin-bottom: 15px;
+    font-size: 16px;
+}
+
+.panel-description {
+    color: #6c757d;
+    font-size: 14px;
+    margin-bottom: 15px;
+    font-style: italic;
+}
+
+.judges-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.judges-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 15px;
+    margin-bottom: 15px;
+}
+
+.calculated-score {
+    background: linear-gradient(135deg, #e3f2fd 0%, #bbdefb 100%);
+    color: #1976d2;
+    padding: 12px 15px;
+    border-radius: 6px;
+    font-weight: 600;
+    text-align: center;
+    margin-top: 10px;
+}
+
+.calculated-score span {
+    font-size: 1.1em;
+    color: #0d47a1;
+}
+
+.total-d-score {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+    color: #e65100;
+    padding: 15px 20px;
+    border-radius: 8px;
+    font-size: 1.2em;
+    text-align: center;
+    margin: 20px 0;
+}
+
+.total-d-score span {
+    font-size: 1.3em;
+}
+
+.final-score {
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    color: white;
+    padding: 25px;
+    border-radius: 12px;
+    margin: 30px 0 20px 0;
+    box-shadow: 0 8px 20px rgba(245, 87, 108, 0.3);
+}
+
+.final-score h3 {
+    color: white;
+    text-align: center;
+    margin-bottom: 20px;
+    font-size: 1.5em;
+    text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.score-breakdown {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 15px;
+    font-size: 1.1em;
+}
+
+.score-breakdown span {
+    background: rgba(255, 255, 255, 0.2);
+    padding: 5px 12px;
+    border-radius: 5px;
+}
+
+.score-breakdown strong {
+    font-size: 1.2em;
+}
+
+.total-final-score {
+    text-align: center;
+    font-size: 3em;
+    font-weight: bold;
+    text-shadow: 3px 3px 6px rgba(0, 0, 0, 0.3);
+    margin-top: 10px;
+}
+
+.btn-large {
+    width: 100%;
+    font-size: 18px;
+    padding: 15px 30px;
+}
+
+.form-group small {
+    display: block;
+    margin-top: 5px;
+    color: #6c757d;
+    font-size: 13px;
+}
+
+@media (max-width: 1024px) {
+    .judges-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
 @media (max-width: 768px) {
     .container {
         border-radius: 0;
@@ -422,6 +572,19 @@ table tbody tr:last-child {
 
     .checkbox-group {
         grid-template-columns: 1fr;
+    }
+
+    .judges-grid,
+    .judges-grid-4 {
+        grid-template-columns: 1fr;
+    }
+
+    .score-breakdown {
+        font-size: 0.9em;
+    }
+
+    .total-final-score {
+        font-size: 2.5em;
     }
 
     .podium-container {

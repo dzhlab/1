@@ -273,18 +273,79 @@ function loadCompetitionForScoring() {
     displayScores();
 }
 
-// Автоматический подсчет общей оценки
-document.getElementById('scoreExecution').addEventListener('input', calculateTotalScore);
-document.getElementById('scoreDifficulty').addEventListener('input', calculateTotalScore);
-document.getElementById('scoreArtistry').addEventListener('input', calculateTotalScore);
+// Автоматический подсчет финального балла по правилам FIG 2025-2028
+function calculateFinalScore() {
+    // D-бригада: DB (Body Difficulty)
+    const db1 = parseFloat(document.getElementById('scoreDB1').value) || 0;
+    const db2 = parseFloat(document.getElementById('scoreDB2').value) || 0;
+    const dbScore = (db1 + db2) / 2;
+    document.getElementById('dbScore').textContent = dbScore.toFixed(2);
 
-function calculateTotalScore() {
-    const execution = parseFloat(document.getElementById('scoreExecution').value) || 0;
-    const difficulty = parseFloat(document.getElementById('scoreDifficulty').value) || 0;
-    const artistry = parseFloat(document.getElementById('scoreArtistry').value) || 0;
+    // D-бригада: DA (Apparatus Difficulty)
+    const da1 = parseFloat(document.getElementById('scoreDA1').value) || 0;
+    const da2 = parseFloat(document.getElementById('scoreDA2').value) || 0;
+    const daScore = (da1 + da2) / 2;
+    document.getElementById('daScore').textContent = daScore.toFixed(2);
 
-    const total = execution + difficulty + artistry;
-    document.getElementById('totalScore').textContent = total.toFixed(2);
+    // D-Score = DB + DA
+    const dScore = dbScore + daScore;
+    document.getElementById('totalDScore').textContent = dScore.toFixed(2);
+    document.getElementById('finalD').textContent = dScore.toFixed(2);
+
+    // E-бригада: Execution (4 судьи, отбросить макс/мин)
+    const eDeductions = [
+        parseFloat(document.getElementById('scoreE1').value) || 0,
+        parseFloat(document.getElementById('scoreE2').value) || 0,
+        parseFloat(document.getElementById('scoreE3').value) || 0,
+        parseFloat(document.getElementById('scoreE4').value) || 0
+    ];
+    const eAvgDeduction = calculateMiddleAverage(eDeductions);
+    const eScore = 10.0 - eAvgDeduction;
+    document.getElementById('totalEScore').textContent = eScore.toFixed(2);
+    document.getElementById('finalE').textContent = eScore.toFixed(2);
+
+    // A-бригада: Artistry (4 судьи, отбросить макс/мин)
+    const aDeductions = [
+        parseFloat(document.getElementById('scoreA1').value) || 0,
+        parseFloat(document.getElementById('scoreA2').value) || 0,
+        parseFloat(document.getElementById('scoreA3').value) || 0,
+        parseFloat(document.getElementById('scoreA4').value) || 0
+    ];
+    const aAvgDeduction = calculateMiddleAverage(aDeductions);
+    const aScore = 10.0 - aAvgDeduction;
+    document.getElementById('totalAScore').textContent = aScore.toFixed(2);
+    document.getElementById('finalA').textContent = aScore.toFixed(2);
+
+    // Штрафы
+    const penalties = parseFloat(document.getElementById('penalties').value) || 0;
+    document.getElementById('finalPenalties').textContent = penalties.toFixed(2);
+
+    // Итоговый балл = D + E + A - Штрафы
+    const finalScore = dScore + eScore + aScore - penalties;
+    document.getElementById('totalFinalScore').textContent = finalScore.toFixed(2);
+
+    return {
+        db: dbScore,
+        da: daScore,
+        d: dScore,
+        e: eScore,
+        a: aScore,
+        penalties: penalties,
+        total: finalScore,
+        judgeScores: {
+            db1, db2, da1, da2,
+            e: eDeductions,
+            a: aDeductions
+        }
+    };
+}
+
+// Функция для расчета среднего из 4 оценок с отбросом макс/мин
+function calculateMiddleAverage(values) {
+    if (values.length !== 4) return 0;
+    const sorted = [...values].sort((a, b) => a - b);
+    // Отбросить минимум и максимум, взять среднее из 2 средних
+    return (sorted[1] + sorted[2]) / 2;
 }
 
 function submitScore() {
@@ -295,24 +356,46 @@ function submitScore() {
 
     const participantId = parseInt(document.getElementById('selectParticipant').value);
     const discipline = document.getElementById('selectDiscipline').value;
-    const execution = parseFloat(document.getElementById('scoreExecution').value);
-    const difficulty = parseFloat(document.getElementById('scoreDifficulty').value);
-    const artistry = parseFloat(document.getElementById('scoreArtistry').value);
 
     if (!participantId || !discipline) {
         alert('Выберите участника и дисциплину!');
         return;
     }
 
-    if (isNaN(execution) || isNaN(difficulty) || isNaN(artistry)) {
-        alert('Введите все оценки!');
+    // Получить все оценки от судей
+    const db1 = parseFloat(document.getElementById('scoreDB1').value);
+    const db2 = parseFloat(document.getElementById('scoreDB2').value);
+    const da1 = parseFloat(document.getElementById('scoreDA1').value);
+    const da2 = parseFloat(document.getElementById('scoreDA2').value);
+
+    const e1 = parseFloat(document.getElementById('scoreE1').value);
+    const e2 = parseFloat(document.getElementById('scoreE2').value);
+    const e3 = parseFloat(document.getElementById('scoreE3').value);
+    const e4 = parseFloat(document.getElementById('scoreE4').value);
+
+    const a1 = parseFloat(document.getElementById('scoreA1').value);
+    const a2 = parseFloat(document.getElementById('scoreA2').value);
+    const a3 = parseFloat(document.getElementById('scoreA3').value);
+    const a4 = parseFloat(document.getElementById('scoreA4').value);
+
+    // Проверить, что все обязательные оценки введены
+    if (isNaN(db1) || isNaN(db2) || isNaN(da1) || isNaN(da2)) {
+        alert('Введите все оценки D-бригады (DB1, DB2, DA1, DA2)!');
         return;
     }
 
-    if (execution < 0 || execution > 10 || difficulty < 0 || difficulty > 10 || artistry < 0 || artistry > 10) {
-        alert('Оценки должны быть в диапазоне от 0 до 10!');
+    if (isNaN(e1) || isNaN(e2) || isNaN(e3) || isNaN(e4)) {
+        alert('Введите все оценки E-бригады (E1, E2, E3, E4)!');
         return;
     }
+
+    if (isNaN(a1) || isNaN(a2) || isNaN(a3) || isNaN(a4)) {
+        alert('Введите все оценки A-бригады (A1, A2, A3, A4)!');
+        return;
+    }
+
+    // Получить рассчитанные значения
+    const scoreData = calculateFinalScore();
 
     // Проверить, есть ли уже оценка для этой комбинации
     const existingScoreIndex = scores.findIndex(s =>
@@ -326,10 +409,30 @@ function submitScore() {
         competitionId: currentCompetition.id,
         participantId: participantId,
         discipline: discipline,
-        execution: execution,
-        difficulty: difficulty,
-        artistry: artistry,
-        total: execution + difficulty + artistry
+        // Оценки судей D-бригады
+        db1: db1,
+        db2: db2,
+        da1: da1,
+        da2: da2,
+        // Оценки судей E-бригады (сбавки)
+        e1: e1,
+        e2: e2,
+        e3: e3,
+        e4: e4,
+        // Оценки судей A-бригады (сбавки)
+        a1: a1,
+        a2: a2,
+        a3: a3,
+        a4: a4,
+        // Штрафы
+        penalties: scoreData.penalties,
+        // Рассчитанные значения
+        dbScore: scoreData.db,
+        daScore: scoreData.da,
+        dScore: scoreData.d,
+        eScore: scoreData.e,
+        aScore: scoreData.a,
+        total: scoreData.total
     };
 
     if (existingScoreIndex >= 0) {
@@ -343,11 +446,43 @@ function submitScore() {
     saveDataToStorage();
     displayScores();
 
-    // Очистить поля оценок
-    document.getElementById('scoreExecution').value = '';
-    document.getElementById('scoreDifficulty').value = '';
-    document.getElementById('scoreArtistry').value = '';
-    document.getElementById('totalScore').textContent = '0.0';
+    // Очистить все поля оценок
+    clearScoringForm();
+}
+
+function clearScoringForm() {
+    // D-бригада
+    document.getElementById('scoreDB1').value = '';
+    document.getElementById('scoreDB2').value = '';
+    document.getElementById('scoreDA1').value = '';
+    document.getElementById('scoreDA2').value = '';
+
+    // E-бригада
+    document.getElementById('scoreE1').value = '';
+    document.getElementById('scoreE2').value = '';
+    document.getElementById('scoreE3').value = '';
+    document.getElementById('scoreE4').value = '';
+
+    // A-бригада
+    document.getElementById('scoreA1').value = '';
+    document.getElementById('scoreA2').value = '';
+    document.getElementById('scoreA3').value = '';
+    document.getElementById('scoreA4').value = '';
+
+    // Штрафы
+    document.getElementById('penalties').value = '';
+
+    // Сбросить отображаемые значения
+    document.getElementById('dbScore').textContent = '0.00';
+    document.getElementById('daScore').textContent = '0.00';
+    document.getElementById('totalDScore').textContent = '0.00';
+    document.getElementById('totalEScore').textContent = '10.00';
+    document.getElementById('totalAScore').textContent = '10.00';
+    document.getElementById('finalD').textContent = '0.00';
+    document.getElementById('finalE').textContent = '10.00';
+    document.getElementById('finalA').textContent = '10.00';
+    document.getElementById('finalPenalties').textContent = '0.00';
+    document.getElementById('totalFinalScore').textContent = '20.00';
 }
 
 function displayScores() {
@@ -368,22 +503,64 @@ function displayScores() {
 
     container.innerHTML = competitionScores.map(s => {
         const participant = participants.find(p => p.id === s.participantId);
-        return `
-            <div class="score-card">
-                <div class="score-header">
-                    <strong>${participant ? participant.name : 'Неизвестный'} - ${disciplineNames[s.discipline]}</strong>
-                    <button class="btn btn-danger" onclick="deleteScore(${s.id})">Удалить</button>
+
+        // Проверка на новый формат оценок (FIG 2025-2028) или старый
+        const isNewFormat = s.dScore !== undefined;
+
+        if (isNewFormat) {
+            return `
+                <div class="score-card">
+                    <div class="score-header">
+                        <strong>${participant ? participant.name : 'Неизвестный'} - ${disciplineNames[s.discipline]}</strong>
+                        <button class="btn btn-danger" onclick="deleteScore(${s.id})">Удалить</button>
+                    </div>
+                    <div style="margin: 15px 0;">
+                        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px;">
+                            <div style="background: #e3f2fd; padding: 10px; border-radius: 5px;">
+                                <strong>D-Score:</strong> ${s.dScore.toFixed(2)}<br>
+                                <small>DB: ${s.dbScore.toFixed(2)} | DA: ${s.daScore.toFixed(2)}</small>
+                            </div>
+                            <div style="background: #f3e5f5; padding: 10px; border-radius: 5px;">
+                                <strong>E-Score:</strong> ${s.eScore.toFixed(2)}<br>
+                                <small>Сбавки: ${s.e1}, ${s.e2}, ${s.e3}, ${s.e4}</small>
+                            </div>
+                            <div style="background: #fff3e0; padding: 10px; border-radius: 5px;">
+                                <strong>A-Score:</strong> ${s.aScore.toFixed(2)}<br>
+                                <small>Сбавки: ${s.a1}, ${s.a2}, ${s.a3}, ${s.a4}</small>
+                            </div>
+                            ${s.penalties > 0 ? `
+                            <div style="background: #ffebee; padding: 10px; border-radius: 5px;">
+                                <strong>Штрафы:</strong> -${s.penalties.toFixed(2)}
+                            </div>
+                            ` : ''}
+                        </div>
+                    </div>
+                    <div style="margin-top: 15px; padding: 10px; background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); color: white; border-radius: 8px; text-align: center;">
+                        <strong style="font-size: 1.3em;">ИТОГО: ${s.total.toFixed(2)}</strong><br>
+                        <small>D (${s.dScore.toFixed(2)}) + E (${s.eScore.toFixed(2)}) + A (${s.aScore.toFixed(2)})${s.penalties > 0 ? ` - Штрафы (${s.penalties.toFixed(2)})` : ''}</small>
+                    </div>
                 </div>
-                <div class="score-details">
-                    <div><strong>Техника:</strong> ${s.execution.toFixed(1)}</div>
-                    <div><strong>Сложность:</strong> ${s.difficulty.toFixed(1)}</div>
-                    <div><strong>Артистизм:</strong> ${s.artistry.toFixed(1)}</div>
+            `;
+        } else {
+            // Старый формат оценок (для обратной совместимости)
+            return `
+                <div class="score-card">
+                    <div class="score-header">
+                        <strong>${participant ? participant.name : 'Неизвестный'} - ${disciplineNames[s.discipline]}</strong>
+                        <button class="btn btn-danger" onclick="deleteScore(${s.id})">Удалить</button>
+                    </div>
+                    <div class="score-details">
+                        <div><strong>Техника:</strong> ${s.execution.toFixed(1)}</div>
+                        <div><strong>Сложность:</strong> ${s.difficulty.toFixed(1)}</div>
+                        <div><strong>Артистизм:</strong> ${s.artistry.toFixed(1)}</div>
+                    </div>
+                    <div style="margin-top: 10px; color: #f5576c; font-size: 1.2em;">
+                        <strong>Итого: ${s.total.toFixed(2)}</strong>
+                        <br><small style="color: #999;">(Старый формат)</small>
+                    </div>
                 </div>
-                <div style="margin-top: 10px; color: #f5576c; font-size: 1.2em;">
-                    <strong>Итого: ${s.total.toFixed(2)}</strong>
-                </div>
-            </div>
-        `;
+            `;
+        }
     }).join('');
 }
 

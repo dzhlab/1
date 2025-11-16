@@ -96,7 +96,10 @@
 
         <!-- Вкладка: Оценки -->
         <div id="scoring" class="tab-content">
-            <h2>Выставление оценок</h2>
+            <h2>Выставление оценок (FIG 2025-2028)</h2>
+            <div class="info-banner">
+                <strong>ℹ️ Система оценивания:</strong> Итоговый балл = D + A + E - Штрафы
+            </div>
 
             <div class="form-card">
                 <div class="form-group">
@@ -121,22 +124,123 @@
                             <option value="">-- Выберите дисциплину --</option>
                         </select>
                     </div>
-                    <div class="form-group">
-                        <label for="scoreExecution">Техника исполнения (E-score, 0-10):</label>
-                        <input type="number" id="scoreExecution" min="0" max="10" step="0.1">
+
+                    <!-- D-бригада: Трудность -->
+                    <h3 class="section-title">📊 D-бригада (Трудность)</h3>
+
+                    <div class="judge-panel">
+                        <h4>DB - Трудность тела (2 судьи)</h4>
+                        <div class="judges-grid">
+                            <div class="form-group">
+                                <label for="scoreDB1">Судья DB1:</label>
+                                <input type="number" id="scoreDB1" min="0" step="0.1" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                            <div class="form-group">
+                                <label for="scoreDB2">Судья DB2:</label>
+                                <input type="number" id="scoreDB2" min="0" step="0.1" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                        </div>
+                        <div class="calculated-score">DB (среднее): <span id="dbScore">0.00</span></div>
                     </div>
-                    <div class="form-group">
-                        <label for="scoreDifficulty">Сложность (D-score, 0-10):</label>
-                        <input type="number" id="scoreDifficulty" min="0" max="10" step="0.1">
+
+                    <div class="judge-panel">
+                        <h4>DA - Трудность предмета (2 судьи)</h4>
+                        <div class="judges-grid">
+                            <div class="form-group">
+                                <label for="scoreDA1">Судья DA1:</label>
+                                <input type="number" id="scoreDA1" min="0" step="0.1" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                            <div class="form-group">
+                                <label for="scoreDA2">Судья DA2:</label>
+                                <input type="number" id="scoreDA2" min="0" step="0.1" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                        </div>
+                        <div class="calculated-score">DA (среднее): <span id="daScore">0.00</span></div>
                     </div>
-                    <div class="form-group">
-                        <label for="scoreArtistry">Артистизм (A-score, 0-10):</label>
-                        <input type="number" id="scoreArtistry" min="0" max="10" step="0.1">
+
+                    <div class="total-d-score">
+                        <strong>D-Score = DB + DA: <span id="totalDScore">0.00</span></strong>
                     </div>
-                    <div class="total-score">
-                        <strong>Общая оценка: <span id="totalScore">0.0</span></strong>
+
+                    <!-- E-бригада: Исполнение -->
+                    <h3 class="section-title">🎯 E-бригада (Исполнение)</h3>
+                    <div class="judge-panel">
+                        <p class="panel-description">4 судьи оценивают сбавки. Отбрасываются макс/мин, среднее из 2 оставшихся.</p>
+                        <div class="judges-grid-4">
+                            <div class="form-group">
+                                <label for="scoreE1">E1 (сбавки):</label>
+                                <input type="number" id="scoreE1" min="0" max="10" step="0.05" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                            <div class="form-group">
+                                <label for="scoreE2">E2 (сбавки):</label>
+                                <input type="number" id="scoreE2" min="0" max="10" step="0.05" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                            <div class="form-group">
+                                <label for="scoreE3">E3 (сбавки):</label>
+                                <input type="number" id="scoreE3" min="0" max="10" step="0.05" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                            <div class="form-group">
+                                <label for="scoreE4">E4 (сбавки):</label>
+                                <input type="number" id="scoreE4" min="0" max="10" step="0.05" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                        </div>
+                        <div class="calculated-score">E-Score (10.0 - средние сбавки): <span id="totalEScore">10.00</span></div>
                     </div>
-                    <button onclick="submitScore()" class="btn btn-primary">Сохранить оценку</button>
+
+                    <!-- A-бригада: Артистизм -->
+                    <h3 class="section-title">🎨 A-бригада (Артистизм)</h3>
+                    <div class="judge-panel">
+                        <p class="panel-description">4 судьи оценивают сбавки. Отбрасываются макс/мин, среднее из 2 оставшихся.</p>
+                        <div class="judges-grid-4">
+                            <div class="form-group">
+                                <label for="scoreA1">A1 (сбавки):</label>
+                                <input type="number" id="scoreA1" min="0" max="10" step="0.05" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                            <div class="form-group">
+                                <label for="scoreA2">A2 (сбавки):</label>
+                                <input type="number" id="scoreA2" min="0" max="10" step="0.05" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                            <div class="form-group">
+                                <label for="scoreA3">A3 (сбавки):</label>
+                                <input type="number" id="scoreA3" min="0" max="10" step="0.05" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                            <div class="form-group">
+                                <label for="scoreA4">A4 (сбавки):</label>
+                                <input type="number" id="scoreA4" min="0" max="10" step="0.05" placeholder="0.0" oninput="calculateFinalScore()">
+                            </div>
+                        </div>
+                        <div class="calculated-score">A-Score (10.0 - средние сбавки): <span id="totalAScore">10.00</span></div>
+                    </div>
+
+                    <!-- Штрафы -->
+                    <h3 class="section-title">⚠️ Штрафы</h3>
+                    <div class="judge-panel">
+                        <div class="form-group">
+                            <label for="penalties">Дополнительные штрафы:</label>
+                            <input type="number" id="penalties" min="0" step="0.05" placeholder="0.0" oninput="calculateFinalScore()">
+                            <small>Нарушения времени, выход за ковер, запрещенные элементы и т.д.</small>
+                        </div>
+                    </div>
+
+                    <!-- Итоговый балл -->
+                    <div class="final-score">
+                        <h3>🏆 ИТОГОВЫЙ БАЛЛ</h3>
+                        <div class="score-breakdown">
+                            <span>D: <strong id="finalD">0.00</strong></span>
+                            <span>+</span>
+                            <span>E: <strong id="finalE">10.00</strong></span>
+                            <span>+</span>
+                            <span>A: <strong id="finalA">10.00</strong></span>
+                            <span>-</span>
+                            <span>Штрафы: <strong id="finalPenalties">0.00</strong></span>
+                            <span>=</span>
+                        </div>
+                        <div class="total-final-score">
+                            <span id="totalFinalScore">20.00</span>
+                        </div>
+                    </div>
+
+                    <button onclick="submitScore()" class="btn btn-primary btn-large">Сохранить оценку</button>
                 </div>
 
                 <div class="scores-list">
