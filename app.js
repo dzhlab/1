@@ -1898,3 +1898,677 @@ function clearAllData() {
         }
     }
 }
+
+// ======================================================================
+// GROUPS AND STREAMS MANAGEMENT
+// ======================================================================
+
+// Global variable for groups
+let groups = JSON.parse(localStorage.getItem('groups')) || [];
+let currentGroup = null;
+let currentGroupParticipants = [];
+
+// Initialize groups
+function initGroups() {
+    groups = JSON.parse(localStorage.getItem('groups')) || [];
+    displayGroups();
+}
+
+// Show group creator
+function showGroupCreator() {
+    document.getElementById('groupCreatorModal').style.display = 'block';
+    document.getElementById('groupForm').reset();
+}
+
+// Close group creator
+function closeGroupCreator() {
+    document.getElementById('groupCreatorModal').style.display = 'none';
+}
+
+// Update apparatus options based on performance type
+function updateApparatusOptions() {
+    const performanceType = document.getElementById('groupPerformanceType').value;
+    const apparatusCheckboxes = document.querySelectorAll('input[name="apparatus"]');
+
+    // All apparatus types are available for all performance types
+    // Just a placeholder for future logic if needed
+}
+
+// Handle group form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const groupForm = document.getElementById('groupForm');
+    if (groupForm) {
+        groupForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // Get selected apparatus
+            const selectedApparatus = Array.from(document.querySelectorAll('input[name="apparatus"]:checked'))
+                .map(cb => cb.value);
+
+            if (selectedApparatus.length === 0) {
+                alert('Выберите хотя бы один вид программы');
+                return;
+            }
+
+            // Get subgroups
+            const subgroupsStr = document.getElementById('subgroups').value;
+            const subgroups = subgroupsStr.split(',').map(s => s.trim()).filter(s => s);
+
+            const group = {
+                id: Date.now(),
+                name: document.getElementById('groupName').value,
+                discipline: document.getElementById('groupDiscipline').value,
+                ageCategory: document.getElementById('groupAgeCategory').value,
+                yearFrom: document.getElementById('groupYearFrom').value || null,
+                yearTo: document.getElementById('groupYearTo').value || null,
+                program: document.getElementById('groupProgram').value,
+                performanceType: document.getElementById('groupPerformanceType').value,
+                apparatus: selectedApparatus,
+                performanceDuration: parseInt(document.getElementById('performanceDuration').value),
+                participantsPerStream: parseInt(document.getElementById('participantsPerStream').value),
+                minParticipantsPerStream: parseInt(document.getElementById('minParticipantsPerStream').value),
+                streamStartTime: document.getElementById('streamStartTime').value,
+                subgroups: subgroups,
+                participants: [],
+                createdAt: new Date().toISOString()
+            };
+
+            groups.push(group);
+            localStorage.setItem('groups', JSON.stringify(groups));
+
+            closeGroupCreator();
+            displayGroups();
+
+            showMessage('Группа успешно создана!', 'success');
+        });
+    }
+});
+
+// Display groups
+function displayGroups() {
+    const groupsList = document.getElementById('groupsList');
+
+    if (groups.length === 0) {
+        groupsList.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">👥</div>
+                <p>Нет созданных групп</p>
+                <p style="font-size: 14px; color: var(--ios-gray-1);">Создайте первую группу для организации соревнований</p>
+            </div>
+        `;
+        return;
+    }
+
+    groupsList.innerHTML = groups.map(group => `
+        <div class="group-card" data-group-id="${group.id}">
+            <div class="group-card-header">
+                <div>
+                    <div class="group-card-title">${group.name}</div>
+                    <div class="group-card-info">
+                        ${translateAgeCategory(group.ageCategory)} • ${translateProgram(group.program)}
+                    </div>
+                </div>
+            </div>
+
+            <div class="group-card-stats">
+                <div class="group-stat">
+                    <div class="group-stat-label">Участников</div>
+                    <div class="group-stat-value">${group.participants.length}</div>
+                </div>
+                <div class="group-stat">
+                    <div class="group-stat-label">Потоки</div>
+                    <div class="group-stat-value">${calculateStreamsCount(group)}</div>
+                </div>
+            </div>
+
+            <div class="group-card-info" style="margin-bottom: 12px;">
+                <strong>Дисциплина:</strong> ${translateDisciplineType(group.discipline)}<br>
+                <strong>Тип:</strong> ${translatePerformanceType(group.performanceType)}<br>
+                <strong>Виды:</strong> ${group.apparatus.map(a => translateApparatus(a)).join(', ')}<br>
+                <strong>Время выступления:</strong> ${group.performanceDuration} сек.
+            </div>
+
+            <div class="group-card-actions">
+                <button class="btn btn-primary btn-sm" onclick="openGroupParticipants(${group.id})">
+                    👥 Управление участниками
+                </button>
+                <button class="btn btn-secondary btn-sm" onclick="editGroup(${group.id})">
+                    ✏️ Редактировать
+                </button>
+                <button class="btn btn-danger btn-sm" onclick="deleteGroup(${group.id})">
+                    🗑️ Удалить
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Calculate streams count
+function calculateStreamsCount(group) {
+    if (group.participants.length === 0) return 0;
+    return Math.ceil(group.participants.length / group.participantsPerStream);
+}
+
+// Open group participants management
+function openGroupParticipants(groupId) {
+    currentGroup = groups.find(g => g.id === groupId);
+    if (!currentGroup) return;
+
+    currentGroupParticipants = [...currentGroup.participants];
+
+    document.getElementById('currentGroupName').textContent = currentGroup.name;
+    document.getElementById('currentGroupInfo').textContent = `${translateAgeCategory(currentGroup.ageCategory)} • ${translateProgram(currentGroup.program)}`;
+
+    displayGroupParticipants();
+    document.getElementById('groupParticipantsModal').style.display = 'block';
+}
+
+// Close group participants
+function closeGroupParticipants() {
+    document.getElementById('groupParticipantsModal').style.display = 'none';
+    currentGroup = null;
+    currentGroupParticipants = [];
+}
+
+// Display group participants
+function displayGroupParticipants() {
+    const tbody = document.getElementById('groupParticipantsTableBody');
+
+    if (currentGroupParticipants.length === 0) {
+        tbody.innerHTML = `
+            <tr>
+                <td colspan="11" style="text-align: center; padding: 40px; color: var(--ios-gray-1);">
+                    Нет участников. Добавьте участников или загрузите из файла.
+                </td>
+            </tr>
+        `;
+        return;
+    }
+
+    tbody.innerHTML = currentGroupParticipants.map((participant, index) => `
+        <tr>
+            <td><span class="participant-number">${index + 1}</span></td>
+            <td>${participant.fullName}</td>
+            <td>${formatDate(participant.birthDate)}</td>
+            <td>${participant.city}</td>
+            <td>${participant.club}</td>
+            <td>${participant.coach}</td>
+            <td><span class="rank-badge ${participant.rank}">${translateRank(participant.rank)}</span></td>
+            <td>${participant.stream ? `<span class="stream-badge stream-${participant.stream.toLowerCase()}">${participant.stream}</span>` : '-'}</td>
+            <td>${participant.streamTime ? `<span class="time-badge">${participant.streamTime}</span>` : '-'}</td>
+            <td>${participant.apparatus ? `<span class="apparatus-badge">Вид ${participant.apparatus}</span>` : '-'}</td>
+            <td>
+                <div class="participant-actions">
+                    <button class="btn-icon-sm btn-up" onclick="moveParticipantUp(${index})" title="Вверх" ${index === 0 ? 'disabled' : ''}>
+                        ↑
+                    </button>
+                    <button class="btn-icon-sm btn-down" onclick="moveParticipantDown(${index})" title="Вниз" ${index === currentGroupParticipants.length - 1 ? 'disabled' : ''}>
+                        ↓
+                    </button>
+                    <button class="btn-icon-sm btn-delete" onclick="deleteParticipantFromGroup(${index})" title="Удалить">
+                        🗑️
+                    </button>
+                </div>
+            </td>
+        </tr>
+    `).join('');
+}
+
+// Add participant to group
+function addParticipantToGroup() {
+    document.getElementById('addParticipantModal').style.display = 'block';
+    document.getElementById('addParticipantForm').reset();
+}
+
+// Close add participant modal
+function closeAddParticipantModal() {
+    document.getElementById('addParticipantModal').style.display = 'none';
+}
+
+// Handle add participant form submission
+document.addEventListener('DOMContentLoaded', function() {
+    const addParticipantForm = document.getElementById('addParticipantForm');
+    if (addParticipantForm) {
+        addParticipantForm.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const participant = {
+                fullName: document.getElementById('partFullName').value,
+                birthDate: document.getElementById('partBirthDate').value,
+                city: document.getElementById('partCity').value,
+                club: document.getElementById('partClub').value,
+                coach: document.getElementById('partCoach').value,
+                rank: document.getElementById('partRank').value,
+                apparatus: document.getElementById('partApparatus').value || null,
+                stream: null,
+                streamTime: null
+            };
+
+            currentGroupParticipants.push(participant);
+            displayGroupParticipants();
+            closeAddParticipantModal();
+
+            showMessage('Участник добавлен!', 'success');
+        });
+    }
+});
+
+// Move participant up
+function moveParticipantUp(index) {
+    if (index > 0) {
+        [currentGroupParticipants[index - 1], currentGroupParticipants[index]] =
+        [currentGroupParticipants[index], currentGroupParticipants[index - 1]];
+        displayGroupParticipants();
+    }
+}
+
+// Move participant down
+function moveParticipantDown(index) {
+    if (index < currentGroupParticipants.length - 1) {
+        [currentGroupParticipants[index], currentGroupParticipants[index + 1]] =
+        [currentGroupParticipants[index + 1], currentGroupParticipants[index]];
+        displayGroupParticipants();
+    }
+}
+
+// Delete participant from group
+function deleteParticipantFromGroup(index) {
+    if (confirm('Удалить участника из группы?')) {
+        currentGroupParticipants.splice(index, 1);
+        displayGroupParticipants();
+        showMessage('Участник удален', 'info');
+    }
+}
+
+// Clear group participants
+function clearGroupParticipants() {
+    if (confirm('Вы уверены, что хотите очистить весь список участников?')) {
+        currentGroupParticipants = [];
+        displayGroupParticipants();
+        document.getElementById('streamsInfo').style.display = 'none';
+        showMessage('Список участников очищен', 'info');
+    }
+}
+
+// Perform draw (жеребьёвка)
+function performDraw() {
+    if (currentGroupParticipants.length === 0) {
+        alert('Нет участников для жеребьёвки');
+        return;
+    }
+
+    // Animate shuffle
+    const tbody = document.getElementById('groupParticipantsTableBody');
+    const rows = tbody.querySelectorAll('tr');
+    rows.forEach(row => row.classList.add('drawing'));
+
+    setTimeout(() => {
+        // Fisher-Yates shuffle algorithm
+        for (let i = currentGroupParticipants.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [currentGroupParticipants[i], currentGroupParticipants[j]] =
+            [currentGroupParticipants[j], currentGroupParticipants[i]];
+        }
+
+        displayGroupParticipants();
+        showMessage('Жеребьёвка выполнена!', 'success');
+    }, 1500);
+}
+
+// Create streams
+function createStreams() {
+    if (currentGroupParticipants.length === 0) {
+        alert('Нет участников для формирования потоков');
+        return;
+    }
+
+    const participantsPerStream = currentGroup.participantsPerStream;
+    const minPerStream = currentGroup.minParticipantsPerStream;
+    const subgroups = currentGroup.subgroups;
+    const startTime = currentGroup.streamStartTime;
+    const duration = currentGroup.performanceDuration;
+
+    // Calculate number of streams
+    let numStreams = Math.ceil(currentGroupParticipants.length / participantsPerStream);
+
+    // Check if last stream has enough participants
+    const lastStreamSize = currentGroupParticipants.length % participantsPerStream;
+    if (lastStreamSize > 0 && lastStreamSize < minPerStream && numStreams > 1) {
+        // Redistribute participants
+        numStreams = Math.ceil(currentGroupParticipants.length / participantsPerStream);
+    }
+
+    // Assign streams and times
+    let streamIndex = 0;
+    let currentTime = parseTime(startTime);
+    const streamsData = [];
+
+    for (let i = 0; i < currentGroupParticipants.length; i++) {
+        const participant = currentGroupParticipants[i];
+
+        // Determine stream
+        streamIndex = Math.floor(i / participantsPerStream);
+        const subgroup = subgroups[streamIndex % subgroups.length] || `Поток ${streamIndex + 1}`;
+
+        participant.stream = subgroup;
+        participant.streamTime = formatTime(currentTime);
+
+        // Calculate next time
+        if ((i + 1) % participantsPerStream === 0 && i < currentGroupParticipants.length - 1) {
+            // Move to next stream, add break time (5 minutes)
+            currentTime += duration + 300; // 5 min break
+        } else {
+            currentTime += duration;
+        }
+
+        // Track stream data
+        if (!streamsData[streamIndex]) {
+            streamsData[streamIndex] = {
+                name: subgroup,
+                participants: [],
+                startTime: participant.streamTime
+            };
+        }
+        streamsData[streamIndex].participants.push(participant);
+    }
+
+    displayGroupParticipants();
+    displayStreamsInfo(streamsData);
+
+    showMessage(`Сформировано потоков: ${streamsData.length}`, 'success');
+}
+
+// Parse time string to seconds
+function parseTime(timeStr) {
+    const [hours, minutes] = timeStr.split(':').map(Number);
+    return hours * 3600 + minutes * 60;
+}
+
+// Format seconds to time string
+function formatTime(seconds) {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+}
+
+// Display streams info
+function displayStreamsInfo(streamsData) {
+    const streamsInfo = document.getElementById('streamsInfo');
+    const streamsInfoContent = document.getElementById('streamsInfoContent');
+
+    streamsInfoContent.innerHTML = `
+        <div class="streams-info-grid">
+            ${streamsData.map((stream, index) => `
+                <div class="stream-info-card">
+                    <div class="stream-info-header">
+                        <div class="stream-info-title">${stream.name}</div>
+                        <div class="stream-info-count">${stream.participants.length} чел.</div>
+                    </div>
+                    <div class="stream-info-time">${stream.startTime}</div>
+                    <div class="stream-info-participants">
+                        ${stream.participants.map(p => p.fullName).join(', ')}
+                    </div>
+                </div>
+            `).join('')}
+        </div>
+    `;
+
+    streamsInfo.style.display = 'block';
+}
+
+// Save group participants
+function saveGroupParticipants() {
+    if (!currentGroup) return;
+
+    // Find and update group
+    const groupIndex = groups.findIndex(g => g.id === currentGroup.id);
+    if (groupIndex !== -1) {
+        groups[groupIndex].participants = currentGroupParticipants;
+        localStorage.setItem('groups', JSON.stringify(groups));
+
+        displayGroups();
+        showMessage('Изменения сохранены!', 'success');
+    }
+}
+
+// Import participants from Excel
+function importParticipantsFromExcel(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+            // Skip header row
+            for (let i = 1; i < rows.length; i++) {
+                const row = rows[i];
+                if (!row[1]) continue; // Skip empty rows
+
+                const participant = {
+                    fullName: row[1] || '',
+                    birthDate: row[2] || '',
+                    city: row[3] || '',
+                    club: row[4] || '',
+                    coach: row[5] || '',
+                    rank: row[6] || '',
+                    stream: row[7] || null,
+                    streamTime: row[8] || null,
+                    apparatus: row[9] || null
+                };
+
+                currentGroupParticipants.push(participant);
+            }
+
+            displayGroupParticipants();
+            showMessage(`Загружено участников: ${rows.length - 1}`, 'success');
+        } catch (error) {
+            alert('Ошибка при загрузке файла: ' + error.message);
+        }
+    };
+    reader.readAsArrayBuffer(file);
+
+    // Reset input
+    event.target.value = '';
+}
+
+// Export participants to Excel
+function exportParticipantsToExcel() {
+    if (currentGroupParticipants.length === 0) {
+        alert('Нет участников для выгрузки');
+        return;
+    }
+
+    // Prepare data
+    const data = [
+        ['№', 'ФИО спортсмена', 'Дата рождения', 'Город', 'Клуб', 'Тренер', 'Разряд', 'Поток', 'Время потока', 'Вид программы']
+    ];
+
+    currentGroupParticipants.forEach((participant, index) => {
+        data.push([
+            index + 1,
+            participant.fullName,
+            participant.birthDate,
+            participant.city,
+            participant.club,
+            participant.coach,
+            translateRank(participant.rank),
+            participant.stream || '',
+            participant.streamTime || '',
+            participant.apparatus ? `Вид ${participant.apparatus}` : ''
+        ]);
+    });
+
+    // Create workbook
+    const wb = XLSX.utils.book_new();
+    const ws = XLSX.utils.aoa_to_sheet(data);
+
+    // Set column widths
+    ws['!cols'] = [
+        { wch: 5 },  // №
+        { wch: 25 }, // ФИО
+        { wch: 12 }, // Дата рождения
+        { wch: 15 }, // Город
+        { wch: 20 }, // Клуб
+        { wch: 20 }, // Тренер
+        { wch: 15 }, // Разряд
+        { wch: 10 }, // Поток
+        { wch: 12 }, // Время
+        { wch: 15 }  // Вид программы
+    ];
+
+    XLSX.utils.book_append_sheet(wb, ws, 'Участники');
+
+    // Save file
+    const fileName = `${currentGroup.name}_участники_${new Date().toISOString().split('T')[0]}.xlsx`;
+    XLSX.writeFile(wb, fileName);
+
+    showMessage('Файл Excel выгружен!', 'success');
+}
+
+// Edit group
+function editGroup(groupId) {
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return;
+
+    // Populate form
+    document.getElementById('groupName').value = group.name;
+    document.getElementById('groupDiscipline').value = group.discipline;
+    document.getElementById('groupAgeCategory').value = group.ageCategory;
+    document.getElementById('groupYearFrom').value = group.yearFrom || '';
+    document.getElementById('groupYearTo').value = group.yearTo || '';
+    document.getElementById('groupProgram').value = group.program;
+    document.getElementById('groupPerformanceType').value = group.performanceType;
+    document.getElementById('performanceDuration').value = group.performanceDuration;
+    document.getElementById('participantsPerStream').value = group.participantsPerStream;
+    document.getElementById('minParticipantsPerStream').value = group.minParticipantsPerStream;
+    document.getElementById('streamStartTime').value = group.streamStartTime;
+    document.getElementById('subgroups').value = group.subgroups.join(', ');
+
+    // Check apparatus
+    document.querySelectorAll('input[name="apparatus"]').forEach(cb => {
+        cb.checked = group.apparatus.includes(cb.value);
+    });
+
+    // Delete old group
+    deleteGroup(groupId, true);
+
+    // Show form
+    showGroupCreator();
+}
+
+// Delete group
+function deleteGroup(groupId, silent = false) {
+    if (!silent && !confirm('Удалить группу?')) return;
+
+    const index = groups.findIndex(g => g.id === groupId);
+    if (index !== -1) {
+        groups.splice(index, 1);
+        localStorage.setItem('groups', JSON.stringify(groups));
+        displayGroups();
+
+        if (!silent) {
+            showMessage('Группа удалена', 'info');
+        }
+    }
+}
+
+// Translation helpers
+function translateDisciplineType(discipline) {
+    const map = {
+        'individual': 'Индивидуальные',
+        'group': 'Групповые',
+        'fitness': 'ОФП'
+    };
+    return map[discipline] || discipline;
+}
+
+function translateAgeCategory(category) {
+    const map = {
+        '5-under': 'Девочки (5 лет и младше)',
+        '6-7': 'Девочки (6-7 лет)',
+        '8': 'Девочки (8 лет)',
+        '9': 'Девочки (9 лет)',
+        '10': 'Девочки (10 лет)',
+        '11-12': 'Девочки (11-12 лет)',
+        '13-15': 'Девочки (13-15 лет)',
+        '15-plus': 'Женщины (15 лет и старше)'
+    };
+    return map[category] || category;
+}
+
+function translateProgram(program) {
+    const map = {
+        '3-jun': '3-й юношеский',
+        '2-jun': '2-й юношеский',
+        '1-jun': '1-й юношеский',
+        '3-sport': '3-й спортивный',
+        '2-sport': '2-й спортивный',
+        '1-sport': '1-й спортивный',
+        'kms': 'КМС',
+        'ms': 'МС'
+    };
+    return map[program] || program;
+}
+
+function translatePerformanceType(type) {
+    const map = {
+        'individual': 'Индивидуальные',
+        'team-5plus': 'Команда (5+)',
+        'pairs': 'Двойки',
+        'triples': 'Тройки'
+    };
+    return map[type] || type;
+}
+
+function translateApparatus(apparatus) {
+    const map = {
+        'free': 'Без предмета',
+        'rope': 'Скакалка',
+        'hoop': 'Обруч',
+        'ball': 'Мяч',
+        'clubs': 'Булавы',
+        'ribbon': 'Лента',
+        'mixed': 'Смешанные'
+    };
+    return map[apparatus] || apparatus;
+}
+
+function translateRank(rank) {
+    return translateProgram(rank);
+}
+
+function formatDate(dateStr) {
+    if (!dateStr) return '';
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('ru-RU');
+}
+
+// Show message banner
+function showMessage(message, type = 'info') {
+    const banner = document.createElement('div');
+    banner.className = `message-banner ${type}`;
+    banner.innerHTML = `
+        <span>${type === 'success' ? '✅' : type === 'error' ? '❌' : 'ℹ️'}</span>
+        <span>${message}</span>
+    `;
+
+    const modal = document.getElementById('groupParticipantsModal');
+    if (modal && modal.style.display === 'block') {
+        modal.querySelector('.form-card').prepend(banner);
+    } else {
+        const groupsList = document.getElementById('groupsList');
+        groupsList.parentElement.insertBefore(banner, groupsList);
+    }
+
+    setTimeout(() => banner.remove(), 3000);
+}
+
+// Initialize groups on page load
+if (typeof initGroups === 'function') {
+    initGroups();
+}
