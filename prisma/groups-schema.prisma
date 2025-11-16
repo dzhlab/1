@@ -1,0 +1,247 @@
+// Prisma schema for Groups & Streams module
+// Add this to your main schema.prisma file
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum DisciplineType {
+  INDIVIDUAL   // Индивидуальные
+  GROUP        // Групповые
+  FITNESS      // ОФП
+}
+
+enum AgeCategoryType {
+  UNDER_5      // Девочки (5 лет и младше)
+  AGE_6_7      // Девочки (6-7 лет)
+  AGE_8        // Девочки (8 лет)
+  AGE_9        // Девочки (9 лет)
+  AGE_10       // Девочки (10 лет)
+  AGE_11_12    // Девочки (11-12 лет)
+  AGE_13_15    // Девочки (13-15 лет)
+  AGE_15_PLUS  // Женщины (15 лет и старше)
+}
+
+enum ProgramType {
+  THIRD_JUNIOR   // 3-й юношеский
+  SECOND_JUNIOR  // 2-й юношеский
+  FIRST_JUNIOR   // 1-й юношеский
+  THIRD_SPORT    // 3-й спортивный
+  SECOND_SPORT   // 2-й спортивный
+  FIRST_SPORT    // 1-й спортивный
+  CMS            // КМС (Кандидат в мастера спорта)
+  MS             // МС (Мастер спорта)
+}
+
+enum PerformanceType {
+  INDIVIDUAL   // Индивидуальные
+  TEAM_5_PLUS  // Команда (5 гимнасток и более)
+  PAIRS        // Двойки
+  TRIPLES      // Тройки
+}
+
+enum ApparatusType {
+  FREE    // Без предмета
+  ROPE    // Скакалка
+  HOOP    // Обруч
+  BALL    // Мяч
+  CLUBS   // Булавы
+  RIBBON  // Лента
+  MIXED   // Смешанные
+}
+
+// ============================================
+// MODELS
+// ============================================
+
+model Group {
+  id        String   @id @default(cuid())
+
+  // Basic info
+  name      String   @db.VarChar(200)
+
+  // Group settings
+  discipline        DisciplineType
+  ageCategory       AgeCategoryType
+  yearFrom          Int?             // Год рождения (с)
+  yearTo            Int?             // Год рождения (по)
+  program           ProgramType
+  performanceType   PerformanceType
+
+  // Apparatus configuration
+  apparatus         ApparatusType[]  // Виды программ
+  apparatusOrder    ApparatusType[]  // Порядок выступления видов
+
+  // Performance settings
+  performanceDuration Int  @default(90)  // Секунды
+
+  // Stream settings
+  athletesPerStream    Int  @default(6)   // Участников в потоке
+  minAthletesPerStream Int  @default(3)   // Минимум в потоке
+  streamStartTime      String @db.VarChar(5) // HH:mm format
+  subgroups            String[] // ["A", "B", "C"]
+
+  // Relations
+  athletes  GroupAthlete[]
+  streams   Stream[]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Indexes
+  @@index([discipline, ageCategory])
+  @@index([program])
+  @@index([createdAt])
+}
+
+model GroupAthlete {
+  id      String   @id @default(cuid())
+  groupId String
+
+  // Athlete personal info
+  fullName  String   @db.VarChar(200)
+  birthDate DateTime @db.Date
+  city      String   @db.VarChar(100)
+  club      String   @db.VarChar(200)
+  coach     String   @db.VarChar(200)
+  rank      ProgramType
+
+  // Performance info
+  orderNumber     Int             // Порядковый номер выступления
+  streamId        String?         // ID потока
+  streamTime      String?         // Время выступления (HH:mm)
+  apparatusNumber Int?            // Номер вида программы (1-6)
+  subgroup        String?         // Подгруппа (A, B, C)
+
+  // Relations
+  group  Group   @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  stream Stream? @relation(fields: [streamId], references: [id], onDelete: SetNull)
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Indexes
+  @@index([groupId, orderNumber])
+  @@index([streamId])
+  @@index([fullName])
+  @@index([club])
+  @@index([birthDate])
+}
+
+model Stream {
+  id      String   @id @default(cuid())
+  groupId String
+
+  // Stream info
+  name        String   @db.VarChar(100)  // "Поток A", "Группа 1"
+  subgroup    String   @db.VarChar(10)   // A, B, C
+  startTime   String   @db.VarChar(5)    // HH:mm
+  orderNumber Int                        // Порядковый номер потока
+
+  // Relations
+  group    Group          @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  athletes GroupAthlete[]
+
+  // Metadata
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Indexes
+  @@index([groupId, orderNumber])
+  @@index([startTime])
+}
+
+// ============================================
+// AUDIT LOG for changes tracking
+// ============================================
+
+model GroupAuditLog {
+  id String @id @default(cuid())
+
+  groupId    String
+  action     String        // CREATE, UPDATE, DELETE, REORDER, DRAW, IMPORT
+  entityType String        // GROUP, ATHLETE, STREAM
+  entityId   String?
+
+  userId     String?       // User who performed action
+  changes    Json?         // Before/after data
+  metadata   Json?         // Additional info (e.g., draw strategy)
+
+  createdAt  DateTime @default(now())
+
+  @@index([groupId, createdAt])
+  @@index([entityType, entityId])
+  @@index([userId])
+}
+
+// ============================================
+// IMPORT JOBS for tracking Excel imports
+// ============================================
+
+model ImportJob {
+  id String @id @default(cuid())
+
+  groupId  String
+
+  status   ImportStatus @default(PENDING)
+
+  // Statistics
+  totalRows     Int  @default(0)
+  processedRows Int  @default(0)
+  importedRows  Int  @default(0)
+  skippedRows   Int  @default(0)
+  errorRows     Int  @default(0)
+
+  // File info
+  fileName      String?
+  fileSize      Int?
+
+  // Errors
+  errors        Json?  // Array of ImportError
+
+  // Timing
+  startedAt     DateTime?
+  completedAt   DateTime?
+
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([groupId, status])
+  @@index([createdAt])
+}
+
+enum ImportStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+}
+
+// ============================================
+// DRAW HISTORY for tracking lottery results
+// ============================================
+
+model DrawHistory {
+  id String @id @default(cuid())
+
+  groupId  String
+
+  strategy String        // random, by_apparatus, by_subgroup, by_group
+
+  // Before/After state
+  beforeOrder Json       // Array of { athleteId, orderNumber }
+  afterOrder  Json       // Array of { athleteId, orderNumber }
+
+  // Statistics
+  athletesCount Int
+
+  // User info
+  userId       String?
+
+  createdAt    DateTime @default(now())
+
+  @@index([groupId, createdAt])
+  @@index([strategy])
+}
