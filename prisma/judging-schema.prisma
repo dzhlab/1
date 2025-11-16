@@ -71,6 +71,10 @@ model JudgingSession {
   groupId       String?  // Reference to Group from competition module
   dateId        String?  // Reference to CompetitionDate
 
+  // Brigade assignment
+  brigade       JudgingBrigade? @relation("BrigadeToSession", fields: [brigadeId], references: [id])
+  brigadeId     String?
+
   // Session details
   name          String   @db.VarChar(200)
   apparatus     String   @db.VarChar(50)  // ROPE, HOOP, BALL, CLUBS, RIBBON, FREEHAND
@@ -473,6 +477,74 @@ model JudgingAuditLog {
   @@index([sessionId, createdAt])
   @@index([actorId])
   @@index([action])
+}
+
+// ============================================================================
+// BRIGADE MANAGEMENT
+// ============================================================================
+
+/// Judging Brigade (group of judges working together)
+model JudgingBrigade {
+  id          String   @id @default(cuid())
+
+  // Brigade details
+  name        String   @db.VarChar(200)  // e.g., "Бригада #1", "D-Panel группа A"
+  number      Int?     // Optional brigade number
+  description String?  @db.VarChar(500)
+
+  // Competition reference
+  competitionId String?  // Which competition this brigade is for
+
+  // Brigade type/specialization (optional)
+  specializationType String?  @db.VarChar(50)  // "D_PANEL", "E_PANEL", "MIXED", etc.
+
+  // Status
+  isActive    Boolean  @default(true)
+
+  // Judges assigned to this brigade
+  judges      JudgeInBrigade[]
+
+  // Sessions where this brigade is assigned
+  sessions    JudgingSession[]  @relation("BrigadeToSession")
+
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?  // User ID who created
+
+  @@index([competitionId])
+  @@index([isActive])
+}
+
+/// Judge assignment to a brigade
+model JudgeInBrigade {
+  id          String   @id @default(cuid())
+
+  brigade     JudgingBrigade @relation(fields: [brigadeId], references: [id], onDelete: Cascade)
+  brigadeId   String
+
+  // Judge details
+  judgeId     String   // User ID
+  judgeName   String   @db.VarChar(200)
+  judgeRole   JudgeRole
+  panelType   JudgePanelType
+
+  // Assignment details
+  isPrimary   Boolean  @default(false)  // Primary/backup judge
+  assignedAt  DateTime @default(now())
+  assignedBy  String?  // User ID who assigned
+
+  // Status
+  isActive    Boolean  @default(true)
+
+  // Metadata
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([brigadeId, judgeId])
+  @@index([brigadeId])
+  @@index([judgeId])
+  @@index([judgeRole])
 }
 
 // ============================================================================
