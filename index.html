@@ -7,16 +7,83 @@
     <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-    <div class="container">
+    <!-- Экран выбора роли -->
+    <div id="roleSelection" class="role-selection">
+        <div class="role-container">
+            <h1>🎀 Система управления соревнованиями</h1>
+            <h2>Выберите вашу роль</h2>
+
+            <div class="roles-grid">
+                <div class="role-card" onclick="selectRole('chief_judge')">
+                    <div class="role-icon">👨‍⚖️</div>
+                    <h3>Главный судья</h3>
+                    <p>Управление соревнованиями, утверждение результатов</p>
+                </div>
+
+                <div class="role-card" onclick="selectRole('secretary')">
+                    <div class="role-icon">📋</div>
+                    <h3>Секретарь</h3>
+                    <p>Регистрация участников, ведение документации</p>
+                </div>
+
+                <div class="role-card" onclick="selectRole('technical_specialist')">
+                    <div class="role-icon">⚙️</div>
+                    <h3>Технический специалист</h3>
+                    <p>Техническая поддержка, настройки системы</p>
+                </div>
+
+                <div class="role-card" onclick="selectRole('judge_d')">
+                    <div class="role-icon">📊</div>
+                    <h3>Судья D-бригады</h3>
+                    <p>Оценка трудности (DB/DA)</p>
+                </div>
+
+                <div class="role-card" onclick="selectRole('judge_e')">
+                    <div class="role-icon">🎯</div>
+                    <h3>Судья E-бригады</h3>
+                    <p>Оценка исполнения</p>
+                </div>
+
+                <div class="role-card" onclick="selectRole('judge_a')">
+                    <div class="role-icon">🎨</div>
+                    <h3>Судья A-бригады</h3>
+                    <p>Оценка артистизма</p>
+                </div>
+
+                <div class="role-card" onclick="selectRole('coordinator')">
+                    <div class="role-icon">📅</div>
+                    <h3>Координатор</h3>
+                    <p>Организация, расписание соревнований</p>
+                </div>
+
+                <div class="role-card" onclick="selectRole('viewer')">
+                    <div class="role-icon">👁️</div>
+                    <h3>Зритель</h3>
+                    <p>Просмотр результатов</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Основное приложение -->
+    <div id="mainApp" class="container" style="display: none;">
         <header>
-            <h1>🎀 Система управления соревнованиями по художественной гимнастике</h1>
+            <div class="header-content">
+                <h1>🎀 Система управления соревнованиями по художественной гимнастике</h1>
+                <div class="user-info">
+                    <span class="current-role" id="currentRole"></span>
+                    <button class="btn btn-secondary btn-sm" onclick="changeRole()">Сменить роль</button>
+                </div>
+            </div>
         </header>
 
-        <nav class="tabs">
-            <button class="tab-button active" onclick="showTab('participants')">Участники</button>
-            <button class="tab-button" onclick="showTab('competitions')">Соревнования</button>
-            <button class="tab-button" onclick="showTab('scoring')">Оценки</button>
-            <button class="tab-button" onclick="showTab('results')">Результаты</button>
+        <nav class="tabs" id="mainTabs">
+            <button class="tab-button active" data-tab="participants" onclick="showTab('participants')">Участники</button>
+            <button class="tab-button" data-tab="competitions" onclick="showTab('competitions')">Соревнования</button>
+            <button class="tab-button" data-tab="scoring" onclick="showTab('scoring')">Оценки</button>
+            <button class="tab-button" data-tab="results" onclick="showTab('results')">Результаты</button>
+            <button class="tab-button" data-tab="protocols" onclick="showTab('protocols')" style="display: none;">Протоколы</button>
+            <button class="tab-button" data-tab="reports" onclick="showTab('reports')" style="display: none;">Отчеты</button>
         </nav>
 
         <!-- Вкладка: Участники -->
@@ -272,6 +339,95 @@
                 <div class="winners-podium">
                     <h3>🏆 Победители</h3>
                     <div id="winnersPodium"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Вкладка: Протоколы -->
+        <div id="protocols" class="tab-content">
+            <h2>Протоколы соревнований</h2>
+
+            <div class="form-card">
+                <div class="form-group">
+                    <label for="selectCompetitionProtocol">Выберите соревнование:</label>
+                    <select id="selectCompetitionProtocol" onchange="loadProtocols()">
+                        <option value="">-- Выберите соревнование --</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="protocolsArea">
+                <div class="protocol-buttons">
+                    <button class="btn btn-primary" onclick="generateStartProtocol()">
+                        📋 Стартовый протокол
+                    </button>
+                    <button class="btn btn-primary" onclick="generateScoreProtocol()">
+                        📊 Протокол оценок
+                    </button>
+                    <button class="btn btn-primary" onclick="generateFinalProtocol()">
+                        🏆 Итоговый протокол
+                    </button>
+                    <button class="btn btn-secondary" onclick="exportProtocolPDF()">
+                        📄 Экспорт в PDF
+                    </button>
+                </div>
+
+                <div id="protocolContent" class="protocol-content"></div>
+            </div>
+        </div>
+
+        <!-- Вкладка: Отчеты (для Главного судьи и Технического специалиста) -->
+        <div id="reports" class="tab-content">
+            <h2>Отчеты и статистика</h2>
+
+            <div class="reports-grid">
+                <div class="report-card">
+                    <h3>📊 Общая статистика</h3>
+                    <div id="generalStats">
+                        <div class="stat-item">
+                            <span class="stat-label">Всего соревнований:</span>
+                            <span class="stat-value" id="totalCompetitions">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Всего участников:</span>
+                            <span class="stat-value" id="totalParticipants">0</span>
+                        </div>
+                        <div class="stat-item">
+                            <span class="stat-label">Выставлено оценок:</span>
+                            <span class="stat-value" id="totalScores">0</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="report-card">
+                    <h3>🏅 Лучшие результаты</h3>
+                    <div id="topResults"></div>
+                </div>
+
+                <div class="report-card">
+                    <h3>📈 Статистика по категориям</h3>
+                    <div id="categoryStats"></div>
+                </div>
+
+                <div class="report-card">
+                    <h3>🎯 Средние оценки</h3>
+                    <div id="averageScores"></div>
+                </div>
+            </div>
+
+            <div class="form-card">
+                <h3>⚙️ Управление данными</h3>
+                <div class="data-management">
+                    <button class="btn btn-secondary" onclick="exportAllData()">
+                        💾 Экспорт всех данных (JSON)
+                    </button>
+                    <button class="btn btn-secondary" onclick="document.getElementById('importFile').click()">
+                        📂 Импорт данных
+                    </button>
+                    <input type="file" id="importFile" accept=".json" style="display: none;" onchange="importData(event)">
+                    <button class="btn btn-danger" onclick="clearAllData()">
+                        🗑️ Очистить все данные
+                    </button>
                 </div>
             </div>
         </div>

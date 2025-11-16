@@ -1,4 +1,214 @@
 // ==============================================
+// СИСТЕМА РОЛЕЙ И ДОСТУПА
+// ==============================================
+
+let currentUser = {
+    role: null,
+    permissions: {}
+};
+
+// Определение ролей и их прав доступа
+const ROLES = {
+    chief_judge: {
+        name: 'Главный судья',
+        icon: '👨‍⚖️',
+        tabs: ['participants', 'competitions', 'scoring', 'results', 'protocols', 'reports'],
+        canEdit: {
+            participants: true,
+            competitions: true,
+            scoring: true
+        },
+        canApprove: true,
+        canDelete: true
+    },
+    secretary: {
+        name: 'Секретарь',
+        icon: '📋',
+        tabs: ['participants', 'competitions', 'results', 'protocols'],
+        canEdit: {
+            participants: true,
+            competitions: false,
+            scoring: false
+        },
+        canApprove: false,
+        canDelete: false
+    },
+    technical_specialist: {
+        name: 'Технический специалист',
+        icon: '⚙️',
+        tabs: ['participants', 'competitions', 'scoring', 'results', 'reports'],
+        canEdit: {
+            participants: false,
+            competitions: true,
+            scoring: false
+        },
+        canApprove: false,
+        canDelete: true
+    },
+    judge_d: {
+        name: 'Судья D-бригады',
+        icon: '📊',
+        tabs: ['scoring', 'results'],
+        canEdit: {
+            participants: false,
+            competitions: false,
+            scoring: true
+        },
+        judgeType: 'D',
+        canApprove: false,
+        canDelete: false
+    },
+    judge_e: {
+        name: 'Судья E-бригады',
+        icon: '🎯',
+        tabs: ['scoring', 'results'],
+        canEdit: {
+            participants: false,
+            competitions: false,
+            scoring: true
+        },
+        judgeType: 'E',
+        canApprove: false,
+        canDelete: false
+    },
+    judge_a: {
+        name: 'Судья A-бригады',
+        icon: '🎨',
+        tabs: ['scoring', 'results'],
+        canEdit: {
+            participants: false,
+            competitions: false,
+            scoring: true
+        },
+        judgeType: 'A',
+        canApprove: false,
+        canDelete: false
+    },
+    coordinator: {
+        name: 'Координатор соревнований',
+        icon: '📅',
+        tabs: ['participants', 'competitions', 'results'],
+        canEdit: {
+            participants: true,
+            competitions: true,
+            scoring: false
+        },
+        canApprove: false,
+        canDelete: false
+    },
+    viewer: {
+        name: 'Зритель',
+        icon: '👁️',
+        tabs: ['results'],
+        canEdit: {
+            participants: false,
+            competitions: false,
+            scoring: false
+        },
+        canApprove: false,
+        canDelete: false
+    }
+};
+
+// Функция выбора роли
+function selectRole(roleKey) {
+    currentUser.role = roleKey;
+    currentUser.permissions = ROLES[roleKey];
+
+    // Сохранить в localStorage
+    localStorage.setItem('currentRole', roleKey);
+
+    // Скрыть экран выбора роли
+    document.getElementById('roleSelection').style.display = 'none';
+
+    // Показать основное приложение
+    document.getElementById('mainApp').style.display = 'block';
+
+    // Обновить интерфейс
+    updateInterfaceForRole();
+
+    // Загрузить данные
+    loadDataFromStorage();
+    displayParticipants();
+    displayCompetitions();
+    updateCompetitionSelects();
+
+    // Обновить статистику для отчетов
+    if (currentUser.permissions.tabs.includes('reports')) {
+        updateReportsStats();
+    }
+}
+
+// Обновить интерфейс в зависимости от роли
+function updateInterfaceForRole() {
+    const role = currentUser.permissions;
+
+    // Обновить заголовок с ролью
+    document.getElementById('currentRole').textContent = `${role.icon} ${role.name}`;
+
+    // Показать/скрыть вкладки
+    const allTabs = document.querySelectorAll('.tab-button');
+    allTabs.forEach(tab => {
+        const tabName = tab.getAttribute('data-tab');
+        if (role.tabs.includes(tabName)) {
+            tab.style.display = 'block';
+        } else {
+            tab.style.display = 'none';
+        }
+    });
+
+    // Активировать первую доступную вкладку
+    if (role.tabs.length > 0) {
+        showTab(role.tabs[0]);
+    }
+
+    // Настроить интерфейс оценок для судей
+    if (currentUser.role.startsWith('judge_')) {
+        setupJudgeInterface();
+    }
+}
+
+// Настройка интерфейса для конкретного судьи
+function setupJudgeInterface() {
+    const judgeType = currentUser.permissions.judgeType;
+
+    // Скрыть/показать соответствующие поля оценок
+    // Это будет реализовано при загрузке формы оценок
+}
+
+// Сменить роль
+function changeRole() {
+    // Очистить текущую роль
+    currentUser.role = null;
+    currentUser.permissions = {};
+    localStorage.removeItem('currentRole');
+
+    // Показать экран выбора роли
+    document.getElementById('roleSelection').style.display = 'flex';
+
+    // Скрыть основное приложение
+    document.getElementById('mainApp').style.display = 'none';
+}
+
+// Проверка прав доступа
+function hasPermission(action, section) {
+    if (!currentUser.permissions) return false;
+
+    switch (action) {
+        case 'view':
+            return currentUser.permissions.tabs.includes(section);
+        case 'edit':
+            return currentUser.permissions.canEdit && currentUser.permissions.canEdit[section];
+        case 'delete':
+            return currentUser.permissions.canDelete;
+        case 'approve':
+            return currentUser.permissions.canApprove;
+        default:
+            return false;
+    }
+}
+
+// ==============================================
 // ИНИЦИАЛИЗАЦИЯ И УПРАВЛЕНИЕ ДАННЫМИ
 // ==============================================
 
@@ -26,9 +236,18 @@ const categoryNames = {
 // Загрузка данных из localStorage при запуске
 window.addEventListener('DOMContentLoaded', () => {
     loadDataFromStorage();
-    displayParticipants();
-    displayCompetitions();
-    updateCompetitionSelects();
+
+    // Проверить, есть ли сохраненная роль
+    const savedRole = localStorage.getItem('currentRole');
+
+    if (savedRole && ROLES[savedRole]) {
+        // Автоматически войти с сохраненной ролью
+        selectRole(savedRole);
+    } else {
+        // Показать экран выбора роли
+        document.getElementById('roleSelection').style.display = 'flex';
+        document.getElementById('mainApp').style.display = 'none';
+    }
 });
 
 // Сохранение и загрузка данных
@@ -708,4 +927,465 @@ function displayWinnersPodium(results) {
 
     podiumHTML += '</div>';
     container.innerHTML = podiumHTML;
+}
+
+// ==============================================
+// ПРОТОКОЛЫ
+// ==============================================
+
+function loadProtocols() {
+    const competitionId = parseInt(document.getElementById('selectCompetitionProtocol').value);
+    updateCompetitionSelectForProtocols();
+}
+
+function updateCompetitionSelectForProtocols() {
+    const select = document.getElementById('selectCompetitionProtocol');
+    const options = competitions.map(c =>
+        `<option value="${c.id}">${c.name} (${new Date(c.date).toLocaleDateString('ru-RU')})</option>`
+    ).join('');
+    select.innerHTML = '<option value="">-- Выберите соревнование --</option>' + options;
+}
+
+// Генерация стартового протокола
+function generateStartProtocol() {
+    const competitionId = parseInt(document.getElementById('selectCompetitionProtocol').value);
+    if (!competitionId) {
+        alert('Выберите соревнование!');
+        return;
+    }
+
+    const competition = competitions.find(c => c.id === competitionId);
+    const eligibleParticipants = participants.filter(p => p.category === competition.category);
+
+    let html = `
+        <div class="protocol-header">
+            <h2>СТАРТОВЫЙ ПРОТОКОЛ</h2>
+            <div class="protocol-info">
+                <p><strong>${competition.name}</strong></p>
+                <p>Дата: ${new Date(competition.date).toLocaleDateString('ru-RU')}</p>
+                <p>Категория: ${categoryNames[competition.category]}</p>
+            </div>
+        </div>
+
+        <table class="protocol-table">
+            <thead>
+                <tr>
+                    <th>№</th>
+                    <th>ФИО</th>
+                    <th>Возраст</th>
+                    <th>Клуб/Школа</th>
+                    <th>Дисциплины</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    eligibleParticipants.forEach((p, index) => {
+        html += `
+            <tr>
+                <td>${index + 1}</td>
+                <td>${p.name}</td>
+                <td>${p.age}</td>
+                <td>${p.club}</td>
+                <td>${competition.disciplines.map(d => disciplineNames[d]).join(', ')}</td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+
+        <div class="protocol-signature">
+            <div class="signature-line">
+                <div class="signature-label">Главный судья</div>
+                <div>_________________</div>
+            </div>
+            <div class="signature-line">
+                <div class="signature-label">Секретарь</div>
+                <div>_________________</div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('protocolContent').innerHTML = html;
+}
+
+// Генерация протокола оценок
+function generateScoreProtocol() {
+    const competitionId = parseInt(document.getElementById('selectCompetitionProtocol').value);
+    if (!competitionId) {
+        alert('Выберите соревнование!');
+        return;
+    }
+
+    const competition = competitions.find(c => c.id === competitionId);
+    const competitionScores = scores.filter(s => s.competitionId === competitionId);
+
+    let html = `
+        <div class="protocol-header">
+            <h2>ПРОТОКОЛ ОЦЕНОК</h2>
+            <div class="protocol-info">
+                <p><strong>${competition.name}</strong></p>
+                <p>Дата: ${new Date(competition.date).toLocaleDateString('ru-RU')}</p>
+            </div>
+        </div>
+
+        <table class="protocol-table">
+            <thead>
+                <tr>
+                    <th>Участник</th>
+                    <th>Дисциплина</th>
+                    <th>D-Score</th>
+                    <th>E-Score</th>
+                    <th>A-Score</th>
+                    <th>Штрафы</th>
+                    <th>Итого</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    competitionScores.forEach(s => {
+        const participant = participants.find(p => p.id === s.participantId);
+        const isNewFormat = s.dScore !== undefined;
+
+        html += `
+            <tr>
+                <td>${participant ? participant.name : 'Неизвестный'}</td>
+                <td>${disciplineNames[s.discipline]}</td>
+                ${isNewFormat ? `
+                    <td>${s.dScore.toFixed(2)}</td>
+                    <td>${s.eScore.toFixed(2)}</td>
+                    <td>${s.aScore.toFixed(2)}</td>
+                    <td>${s.penalties ? s.penalties.toFixed(2) : '0.00'}</td>
+                ` : `
+                    <td>${s.difficulty ? s.difficulty.toFixed(2) : '-'}</td>
+                    <td>${s.execution ? s.execution.toFixed(2) : '-'}</td>
+                    <td>${s.artistry ? s.artistry.toFixed(2) : '-'}</td>
+                    <td>-</td>
+                `}
+                <td><strong>${s.total.toFixed(2)}</strong></td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+
+        <div class="protocol-signature">
+            <div class="signature-line">
+                <div class="signature-label">Главный судья</div>
+                <div>_________________</div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('protocolContent').innerHTML = html;
+}
+
+// Генерация итогового протокола
+function generateFinalProtocol() {
+    const competitionId = parseInt(document.getElementById('selectCompetitionProtocol').value);
+    if (!competitionId) {
+        alert('Выберите соревнование!');
+        return;
+    }
+
+    const competition = competitions.find(c => c.id === competitionId);
+    const competitionScores = scores.filter(s => s.competitionId === competitionId);
+
+    // Сгруппировать оценки по участникам
+    const participantResults = {};
+
+    competitionScores.forEach(score => {
+        if (!participantResults[score.participantId]) {
+            const participant = participants.find(p => p.id === score.participantId);
+            participantResults[score.participantId] = {
+                participant: participant,
+                scores: [],
+                totalScore: 0
+            };
+        }
+        participantResults[score.participantId].scores.push(score);
+        participantResults[score.participantId].totalScore += score.total;
+    });
+
+    // Преобразовать в массив и отсортировать по общей сумме баллов
+    const resultsArray = Object.values(participantResults).sort((a, b) => b.totalScore - a.totalScore);
+
+    let html = `
+        <div class="protocol-header">
+            <h2>ИТОГОВЫЙ ПРОТОКОЛ</h2>
+            <div class="protocol-info">
+                <p><strong>${competition.name}</strong></p>
+                <p>Дата: ${new Date(competition.date).toLocaleDateString('ru-RU')}</p>
+                <p>Категория: ${categoryNames[competition.category]}</p>
+            </div>
+        </div>
+
+        <table class="protocol-table">
+            <thead>
+                <tr>
+                    <th>Место</th>
+                    <th>ФИО</th>
+                    <th>Клуб</th>
+                    ${competition.disciplines.map(d => `<th>${disciplineNames[d]}</th>`).join('')}
+                    <th>Общий балл</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+
+    resultsArray.forEach((result, index) => {
+        const rank = index + 1;
+        html += `
+            <tr>
+                <td><strong>${rank}</strong></td>
+                <td>${result.participant.name}</td>
+                <td>${result.participant.club}</td>
+        `;
+
+        // Отобразить оценки по каждой дисциплине
+        competition.disciplines.forEach(discipline => {
+            const score = result.scores.find(s => s.discipline === discipline);
+            html += `<td>${score ? score.total.toFixed(2) : '-'}</td>`;
+        });
+
+        html += `
+                <td><strong>${result.totalScore.toFixed(2)}</strong></td>
+            </tr>
+        `;
+    });
+
+    html += `
+            </tbody>
+        </table>
+
+        <div class="protocol-signature">
+            <div class="signature-line">
+                <div class="signature-label">Главный судья</div>
+                <div>_________________</div>
+            </div>
+            <div class="signature-line">
+                <div class="signature-label">Секретарь</div>
+                <div>_________________</div>
+            </div>
+            <div class="signature-line">
+                <div class="signature-label">Технический специалист</div>
+                <div>_________________</div>
+            </div>
+        </div>
+    `;
+
+    document.getElementById('protocolContent').innerHTML = html;
+}
+
+// Экспорт протокола в PDF (упрощенная версия - print)
+function exportProtocolPDF() {
+    const content = document.getElementById('protocolContent').innerHTML;
+    if (!content || content.trim() === '') {
+        alert('Сначала создайте протокол!');
+        return;
+    }
+
+    // Открыть окно печати
+    window.print();
+}
+
+// ==============================================
+// ОТЧЕТЫ И СТАТИСТИКА
+// ==============================================
+
+function updateReportsStats() {
+    // Общая статистика
+    document.getElementById('totalCompetitions').textContent = competitions.length;
+    document.getElementById('totalParticipants').textContent = participants.length;
+    document.getElementById('totalScores').textContent = scores.length;
+
+    // Лучшие результаты
+    displayTopResults();
+
+    // Статистика по категориям
+    displayCategoryStats();
+
+    // Средние оценки
+    displayAverageScores();
+}
+
+function displayTopResults() {
+    const container = document.getElementById('topResults');
+
+    if (scores.length === 0) {
+        container.innerHTML = '<p style="color: #6c757d;">Нет данных</p>';
+        return;
+    }
+
+    // Найти лучшие оценки
+    const topScores = [...scores]
+        .sort((a, b) => b.total - a.total)
+        .slice(0, 10);
+
+    let html = '';
+    topScores.forEach((s, index) => {
+        const participant = participants.find(p => p.id === s.participantId);
+        const competition = competitions.find(c => c.id === s.competitionId);
+
+        html += `
+            <div class="top-result-item">
+                <strong>${index + 1}. ${participant ? participant.name : 'Неизвестный'}</strong>
+                <span>${disciplineNames[s.discipline]} - ${s.total.toFixed(2)} баллов</span>
+                <span style="font-size: 0.85em;">${competition ? competition.name : ''}</span>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html;
+}
+
+function displayCategoryStats() {
+    const container = document.getElementById('categoryStats');
+
+    const categoryData = {};
+
+    participants.forEach(p => {
+        if (!categoryData[p.category]) {
+            categoryData[p.category] = {
+                count: 0,
+                avgAge: 0,
+                totalAge: 0
+            };
+        }
+        categoryData[p.category].count++;
+        categoryData[p.category].totalAge += p.age;
+    });
+
+    let html = '';
+    Object.keys(categoryData).forEach(category => {
+        const data = categoryData[category];
+        const avgAge = (data.totalAge / data.count).toFixed(1);
+
+        html += `
+            <div class="category-stat">
+                <strong>${categoryNames[category]}</strong>: ${data.count} участников
+                <br><small>Средний возраст: ${avgAge} лет</small>
+            </div>
+        `;
+    });
+
+    container.innerHTML = html || '<p style="color: #6c757d;">Нет данных</p>';
+}
+
+function displayAverageScores() {
+    const container = document.getElementById('averageScores');
+
+    if (scores.length === 0) {
+        container.innerHTML = '<p style="color: #6c757d;">Нет данных</p>';
+        return;
+    }
+
+    // Подсчет средних оценок по новому формату
+    const newFormatScores = scores.filter(s => s.dScore !== undefined);
+
+    if (newFormatScores.length === 0) {
+        container.innerHTML = '<p style="color: #6c757d;">Нет оценок в новом формате</p>';
+        return;
+    }
+
+    const totalD = newFormatScores.reduce((sum, s) => sum + s.dScore, 0);
+    const totalE = newFormatScores.reduce((sum, s) => sum + s.eScore, 0);
+    const totalA = newFormatScores.reduce((sum, s) => sum + s.aScore, 0);
+    const count = newFormatScores.length;
+
+    const avgD = (totalD / count).toFixed(2);
+    const avgE = (totalE / count).toFixed(2);
+    const avgA = (totalA / count).toFixed(2);
+
+    container.innerHTML = `
+        <div class="stat-item">
+            <span class="stat-label">Средний D-Score:</span>
+            <span class="stat-value">${avgD}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Средний E-Score:</span>
+            <span class="stat-value">${avgE}</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">Средний A-Score:</span>
+            <span class="stat-value">${avgA}</span>
+        </div>
+    `;
+}
+
+// ==============================================
+// УПРАВЛЕНИЕ ДАННЫМИ
+// ==============================================
+
+function exportAllData() {
+    const data = {
+        participants: participants,
+        competitions: competitions,
+        scores: scores,
+        exportDate: new Date().toISOString(),
+        version: '2.0.0'
+    };
+
+    const dataStr = JSON.stringify(data, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(dataBlob);
+    link.download = `gymnastics-data-${new Date().toISOString().split('T')[0]}.json`;
+    link.click();
+}
+
+function importData(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = function (e) {
+        try {
+            const data = JSON.parse(e.target.result);
+
+            if (confirm('Это заменит все текущие данные. Продолжить?')) {
+                participants = data.participants || [];
+                competitions = data.competitions || [];
+                scores = data.scores || [];
+
+                saveDataToStorage();
+                displayParticipants();
+                displayCompetitions();
+                updateCompetitionSelects();
+                updateReportsStats();
+
+                alert('Данные успешно импортированы!');
+            }
+        } catch (error) {
+            alert('Ошибка при импорте данных: ' + error.message);
+        }
+    };
+    reader.readAsText(file);
+}
+
+function clearAllData() {
+    if (confirm('Вы уверены? Это удалит ВСЕ данные без возможности восстановления!')) {
+        if (confirm('Это действие НЕОБРАТИМО. Точно удалить все данные?')) {
+            participants = [];
+            competitions = [];
+            scores = [];
+
+            saveDataToStorage();
+            displayParticipants();
+            displayCompetitions();
+            updateCompetitionSelects();
+
+            if (currentUser.permissions && currentUser.permissions.tabs.includes('reports')) {
+                updateReportsStats();
+            }
+
+            alert('Все данные удалены!');
+        }
+    }
 }
