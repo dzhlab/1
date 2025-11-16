@@ -231,8 +231,18 @@ model Score {
   reopenedAt  DateTime?
   reopenedBy  String?  // User ID who reopened
 
-  // Components (for detailed scoring)
-  components  Json?    // Individual deductions, bonuses, etc.
+  // Panel-specific data
+  // D-Panel: Difficulty breakdown
+  dPanelData  DifficultyScoreData?
+
+  // E-Panel: Execution deductions
+  ePanelData  ExecutionScoreData?
+
+  // A-Panel: Artistry components
+  aPanelData  ArtistryScoreData?
+
+  // Components (for detailed scoring - DEPRECATED, use panel-specific data)
+  components  Json?    // Legacy field
   /*
     {
       deductions: [
@@ -253,6 +263,182 @@ model Score {
   @@index([sessionId, performerId])
   @@index([judgeAssignmentId])
   @@index([status])
+}
+
+// ============================================================================
+// PANEL-SPECIFIC SCORING DATA
+// ============================================================================
+
+/// D-Panel: Difficulty scoring data (DB and DA)
+model DifficultyScoreData {
+  id          String   @id @default(cuid())
+
+  score       Score    @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  scoreId     String   @unique
+
+  // Difficulty elements
+  bodyDifficulties   Json     // Array of BD elements with values
+  /*
+    [
+      { code: "BD1", value: 0.1, validated: true },
+      { code: "BD2", value: 0.2, validated: true },
+      { code: "BD3", value: 0.3, validated: false }
+    ]
+  */
+
+  apparatusDifficulties Json  // Array of AD elements with values
+  /*
+    [
+      { code: "AD1", value: 0.3, validated: true },
+      { code: "AD2", value: 0.4, validated: true }
+    ]
+  */
+
+  // Calculated totals
+  totalBD     Decimal  @db.Decimal(5, 3)  // Total BD score
+  totalAD     Decimal  @db.Decimal(5, 3)  // Total AD score
+  totalD      Decimal  @db.Decimal(5, 3)  // Total D = BD + AD
+
+  // Technical notes
+  notes       String?  @db.Text
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// E-Panel: Execution scoring data
+model ExecutionScoreData {
+  id          String   @id @default(cuid())
+
+  score       Score    @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  scoreId     String   @unique
+
+  // Execution deductions
+  artisticDeductions Json     // Deductions for artistic performance
+  /*
+    [
+      { category: "BODY", subcategory: "POSTURE", value: 0.1, count: 1 },
+      { category: "BODY", subcategory: "AMPLITUDE", value: 0.2, count: 2 },
+      { category: "APPARATUS", subcategory: "HANDLING", value: 0.1, count: 1 }
+    ]
+  */
+
+  technicalDeductions Json     // Deductions for technical errors
+  /*
+    [
+      { type: "BALANCE_LOSS_SMALL", value: 0.1, count: 1 },
+      { type: "BALANCE_LOSS_MEDIUM", value: 0.3, count: 1 },
+      { type: "FALL", value: 0.5, count: 0 }
+    ]
+  */
+
+  // Line faults (if applicable)
+  lineFaults  Int      @default(0)  // Number of line faults
+  linePenalty Decimal  @db.Decimal(5, 3) @default(0)  // 0.05 per fault
+
+  // Calculated totals
+  totalArtisticDeductions  Decimal  @db.Decimal(5, 3)
+  totalTechnicalDeductions Decimal  @db.Decimal(5, 3)
+  totalDeductions          Decimal  @db.Decimal(5, 3)
+  finalE                   Decimal  @db.Decimal(5, 3)  // 10.0 - deductions
+
+  // Notes
+  notes       String?  @db.Text
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+/// A-Panel: Artistry scoring data
+model ArtistryScoreData {
+  id          String   @id @default(cuid())
+
+  score       Score    @relation(fields: [scoreId], references: [id], onDelete: Cascade)
+  scoreId     String   @unique
+
+  // Artistry components (FIG 2025-2028)
+  musicRelation    Decimal  @db.Decimal(4, 2)  // 0.00 - 2.00
+  bodyExpression   Decimal  @db.Decimal(4, 2)  // 0.00 - 2.00
+  spaceUse         Decimal  @db.Decimal(4, 2)  // 0.00 - 2.00
+  composition      Decimal  @db.Decimal(4, 2)  // 0.00 - 2.00
+  unity            Decimal  @db.Decimal(4, 2)  // 0.00 - 2.00
+
+  // Calculated total
+  totalA       Decimal  @db.Decimal(5, 3)  // Sum of components (max 10.0)
+
+  // Notes
+  notes        String?  @db.Text
+
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+/// Line Judge data (specific to line faults)
+model LineJudgeData {
+  id          String   @id @default(cuid())
+
+  sessionId   String
+  performerId String
+
+  // Line faults
+  faults      Json     // Array of fault events
+  /*
+    [
+      { timestamp: "2025-05-31T10:15:23Z", side: "LEFT", type: "FOOT_OUT" },
+      { timestamp: "2025-05-31T10:16:45Z", side: "RIGHT", type: "APPARATUS_OUT" }
+    ]
+  */
+
+  totalFaults Int      @default(0)
+  penalty     Decimal  @db.Decimal(5, 3)  // 0.05 per fault
+
+  // Status
+  confirmed   Boolean  @default(false)
+  submittedAt DateTime?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sessionId, performerId])
+  @@index([sessionId])
+}
+
+/// Time Keeper data (performance duration tracking)
+model TimeKeeperData {
+  id          String   @id @default(cuid())
+
+  sessionId   String
+  performerId String
+
+  // Timing
+  startTime   DateTime?  // When performance started
+  endTime     DateTime?  // When performance ended
+  duration    Int?       // Duration in milliseconds
+
+  // Music timing
+  musicStartTime  DateTime?
+  musicEndTime    DateTime?
+  musicDuration   Int?    // milliseconds
+
+  // Penalties
+  isOvertime      Boolean  @default(false)
+  overtimeSeconds Int?
+  isUndertime     Boolean  @default(false)
+  undertimeSeconds Int?
+  timePenalty     Decimal  @db.Decimal(5, 3) @default(0)
+
+  // Status
+  confirmed   Boolean  @default(false)
+  submittedAt DateTime?
+
+  // Notes
+  notes       String?  @db.Text
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([sessionId, performerId])
+  @@index([sessionId])
 }
 
 /// Audit log for judging actions
