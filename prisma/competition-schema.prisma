@@ -1,0 +1,464 @@
+// Competition Setup Module - Prisma Schema
+// This schema defines the database structure for the competition setup module
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum EventType {
+  OPENING              // Открытие
+  BREAK                // Перерыв
+  PARADE               // Парад
+  AWARDS               // Награждение
+  SHOWCASE             // Показательное выступление
+  JUDGES_MEETING       // Совещание судей
+  ARRIVAL_DEPARTURE    // Приезд/отъезд
+  FLOOR_TRAINING       // Опробование площадки
+  OTHER                // Другое
+}
+
+enum DateItemType {
+  GROUP                // Группа участников
+  EVENT                // Событие
+}
+
+enum ConflictType {
+  FIXED_TIME_CONFLICT  // Конфликт с фиксированным временем
+  DAY_OVERFLOW         // День заканчивается слишком поздно
+  OVERLAP              // Наложение элементов
+  NEGATIVE_BREAK       // Отрицательный перерыв
+  INSUFFICIENT_TIME    // Недостаточно времени
+}
+
+enum ConflictSeverity {
+  ERROR                // Критическая ошибка
+  WARNING              // Предупреждение
+  INFO                 // Информация
+}
+
+enum ScheduleStatus {
+  DRAFT                // Черновик
+  CALCULATED           // Рассчитано
+  CONFLICTS            // Есть конфликты
+  APPROVED             // Утверждено
+  PUBLISHED            // Опубликовано
+}
+
+enum CompetitionStatus {
+  DRAFT                // Черновик
+  PLANNING             // Планирование
+  REGISTRATION_OPEN    // Регистрация открыта
+  REGISTRATION_CLOSED  // Регистрация закрыта
+  IN_PROGRESS          // Проводится
+  COMPLETED            // Завершено
+  CANCELLED            // Отменено
+}
+
+// ============================================================================
+// MAIN ENTITIES
+// ============================================================================
+
+/// Соревнование
+model Competition {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(300)
+  shortName   String?  @db.VarChar(100)
+  description String?  @db.Text
+
+  // Место проведения
+  city        String?  @db.VarChar(200)
+  venue       String?  @db.VarChar(300)
+  address     String?  @db.VarChar(500)
+
+  // Организация
+  organizer   String?  @db.VarChar(300)
+  organizers  String[] // Multiple organizers
+  contacts    Json?    // Contact information
+
+  // Визуальная идентификация
+  logoUrl     String?  @db.VarChar(500)
+  bannerUrl   String?  @db.VarChar(500)
+  colors      Json?    // Brand colors
+
+  // Статус
+  status      CompetitionStatus @default(DRAFT)
+
+  // Настройки расписания
+  scheduleSettings Json? // Global schedule settings
+  /*
+    {
+      defaultBreakBetweenGroups: 300,  // 5 minutes in seconds
+      defaultBreakBetweenStreams: 180, // 3 minutes
+      minBreakBeforeEvent: 600,        // 10 minutes
+      maxDayEndTime: "22:00",
+      autoRecalculate: true
+    }
+  */
+
+  // Связи
+  dates       CompetitionDate[]
+  protocols   StartProtocol[]
+  auditLogs   CompetitionAuditLog[]
+
+  // Мета-информация
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+  deletedAt   DateTime?
+  deleted     Boolean  @default(false)
+
+  @@index([status])
+  @@index([createdAt])
+  @@index([deleted])
+}
+
+/// Дата соревнования
+model CompetitionDate {
+  id            String   @id @default(cuid())
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  competitionId String
+
+  // Дата и время
+  date          DateTime @db.Date
+  dayNumber     Int      // 1, 2, 3... для отображения "День 1", "День 2"
+  order         Int      // Порядковый номер для сортировки
+
+  // Время дня
+  startTime     String   @db.VarChar(5)  // "HH:MM" format
+  endTime       String?  @db.VarChar(5)  // Calculated automatically
+
+  // Статус расписания
+  scheduleStatus ScheduleStatus @default(DRAFT)
+  lastRecalculatedAt DateTime?
+
+  // Примечания
+  notes         String?  @db.Text
+
+  // Связи
+  items         DateItem[]
+  conflicts     ScheduleConflict[]
+
+  // Мета-информация
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([competitionId, order])
+  @@index([competitionId, date])
+  @@index([competitionId, order])
+}
+
+/// Элемент дня (абстрактная сущность для Group и Event)
+model DateItem {
+  id        String   @id @default(cuid())
+  date      CompetitionDate @relation(fields: [dateId], references: [id], onDelete: Cascade)
+  dateId    String
+
+  // Тип элемента
+  type      DateItemType
+  order     Int      // Порядковый номер в дне
+
+  // Время (рассчитывается автоматически)
+  startTime String?  @db.VarChar(5)  // "HH:MM"
+  endTime   String?  @db.VarChar(5)  // "HH:MM"
+  duration  Int?     // В секундах, рассчитывается автоматически
+
+  // Связь с конкретной сущностью (polymorphic)
+  group     Group?
+  event     Event?
+
+  // Мета-информация
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([dateId, order])
+  @@index([dateId, type])
+  @@index([dateId, order])
+}
+
+/// Группа участников
+model Group {
+  id          String   @id @default(cuid())
+  dateItem    DateItem @relation(fields: [dateItemId], references: [id], onDelete: Cascade)
+  dateItemId  String   @unique
+
+  // Основная информация
+  name        String   @db.VarChar(200)
+  discipline  String   @db.VarChar(100)  // "INDIVIDUAL", "GROUP", etc.
+  ageCategory String   @db.VarChar(100)  // "AGE_10_11", etc.
+  programLevel String  @db.VarChar(100)  // "KMS", "RANK_1", etc.
+
+  // Настройки выступления
+  timePerPerformance Int   @default(90)  // Время одного выступления в секундах
+  apparatus          String[] // ["ROPE", "HOOP", "BALL"]
+  apparatusOrder     String[] // Порядок видов
+
+  // Настройки потоков
+  useStreams         Boolean @default(false)
+  numberOfStreams    Int?    @default(1)
+  athletesPerStream  Int?
+
+  // Связи
+  athletes    GroupAthlete[]
+  streams     Stream[]
+
+  // Рассчитанные значения
+  totalAthletes Int     @default(0)
+  calculatedDuration Int? // В секундах
+
+  // Мета-информация
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dateItemId])
+}
+
+/// Поток внутри группы (для параллельных выступлений)
+model Stream {
+  id          String   @id @default(cuid())
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId     String
+
+  // Основная информация
+  streamNumber Int     // 1, 2, 3...
+  subgroup     String  @db.VarChar(10)  // "A", "B", "C"
+
+  // Время
+  startTime    String? @db.VarChar(5)
+  endTime      String? @db.VarChar(5)
+  duration     Int?    // В секундах
+
+  // Связи
+  athletes     GroupAthlete[]
+
+  // Рассчитанные значения
+  athletesCount Int    @default(0)
+
+  // Мета-информация
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([groupId, streamNumber])
+  @@index([groupId])
+}
+
+/// Участник в группе
+model GroupAthlete {
+  id          String   @id @default(cuid())
+  group       Group    @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  groupId     String
+
+  stream      Stream?  @relation(fields: [streamId], references: [id], onDelete: SetNull)
+  streamId    String?
+
+  // Информация об участнике
+  fullName    String   @db.VarChar(200)
+  birthDate   DateTime @db.Date
+  city        String   @db.VarChar(100)
+  club        String   @db.VarChar(200)
+  coach       String   @db.VarChar(200)
+  rank        String   @db.VarChar(50)
+
+  // Порядок выступления
+  orderNumber Int
+
+  // Время выступления (для каждого вида)
+  performanceTimes Json? // { "ROPE": "10:30", "HOOP": "11:15" }
+
+  // Мета-информация
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([groupId, orderNumber])
+  @@index([streamId])
+}
+
+/// Событие (перерыв, открытие, награждение и т.д.)
+model Event {
+  id          String   @id @default(cuid())
+  dateItem    DateItem @relation(fields: [dateItemId], references: [id], onDelete: Cascade)
+  dateItemId  String   @unique
+
+  // Основная информация
+  type        EventType
+  name        String?  @db.VarChar(200)  // Опциональное название
+  description String?  @db.Text
+
+  // Время
+  duration    Int      // Длительность в секундах
+  isFixedTime Boolean  @default(false)  // Если true, startTime строго фиксировано
+  fixedStartTime String? @db.VarChar(5)  // "HH:MM" если isFixedTime = true
+
+  // Дополнительная информация
+  participants String[] // Участники события (для награждений, парадов)
+  location     String?  @db.VarChar(200) // Место проведения (если отличается)
+
+  // Мета-информация
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([dateItemId])
+  @@index([type])
+}
+
+/// Конфликт в расписании
+model ScheduleConflict {
+  id          String   @id @default(cuid())
+  date        CompetitionDate @relation(fields: [dateId], references: [id], onDelete: Cascade)
+  dateId      String
+
+  // Тип и серьёзность
+  type        ConflictType
+  severity    ConflictSeverity
+
+  // Описание конфликта
+  message     String   @db.Text
+  details     Json?    // Дополнительная информация
+
+  // Элементы, вовлечённые в конфликт
+  involvedItemIds String[] // IDs элементов DateItem
+
+  // Предложения по разрешению
+  suggestions Json?    // Array of suggestions
+  /*
+    [
+      {
+        type: "ADD_STREAMS",
+        description: "Разделить группу на 2 потока",
+        action: { groupId: "xxx", numberOfStreams: 2 },
+        impact: "Сократит время группы на 50%"
+      }
+    ]
+  */
+
+  // Статус
+  resolved    Boolean  @default(false)
+  resolvedAt  DateTime?
+  resolvedBy  String?
+
+  // Мета-информация
+  createdAt   DateTime @default(now())
+
+  @@index([dateId, resolved])
+  @@index([severity])
+}
+
+/// Стартовый протокол
+model StartProtocol {
+  id            String   @id @default(cuid())
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  competitionId String
+
+  // Тип протокола
+  protocolType  String   @db.VarChar(50)  // "PRELIMINARY", "FINAL", "QUALIFICATION"
+  name          String   @db.VarChar(200)
+
+  // Данные протокола
+  data          Json     // Полные данные протокола
+
+  // Файлы
+  pdfUrl        String?  @db.VarChar(500)
+  excelUrl      String?  @db.VarChar(500)
+
+  // Статус
+  isPublished   Boolean  @default(false)
+  publishedAt   DateTime?
+
+  // Мета-информация
+  generatedAt   DateTime @default(now())
+  generatedBy   String?
+
+  @@index([competitionId, protocolType])
+}
+
+/// Лог изменений соревнования (Audit Trail)
+model CompetitionAuditLog {
+  id            String   @id @default(cuid())
+  competition   Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  competitionId String
+
+  // Действие
+  action        String   @db.VarChar(100)  // "CREATE", "UPDATE", "DELETE", "RECALCULATE"
+  entityType    String   @db.VarChar(50)   // "COMPETITION", "DATE", "GROUP", "EVENT"
+  entityId      String?
+
+  // Изменения
+  previousState Json?
+  newState      Json?
+  changes       Json?    // Detailed changes
+
+  // Пользователь
+  userId        String?
+  userName      String?  @db.VarChar(200)
+  ipAddress     String?  @db.VarChar(50)
+
+  // Мета-информация
+  createdAt     DateTime @default(now())
+
+  @@index([competitionId, createdAt])
+  @@index([entityType, entityId])
+  @@index([action])
+}
+
+// ============================================================================
+// HELPER TABLES
+// ============================================================================
+
+/// Шаблоны расписания (для быстрого создания типовых соревнований)
+model ScheduleTemplate {
+  id          String   @id @default(cuid())
+  name        String   @db.VarChar(200)
+  description String?  @db.Text
+
+  // Данные шаблона
+  templateData Json    // Структура соревнования
+  /*
+    {
+      numberOfDays: 3,
+      defaultStartTime: "09:00",
+      defaultEvents: [
+        { type: "OPENING", duration: 1800, day: 1, time: "09:00" },
+        { type: "BREAK", duration: 3600, day: 1, time: "13:00" },
+        ...
+      ]
+    }
+  */
+
+  // Категория
+  category    String?  @db.VarChar(100)  // "REGIONAL", "NATIONAL", "INTERNATIONAL"
+  level       String?  @db.VarChar(100)  // "JUNIOR", "SENIOR", "MIXED"
+
+  // Использование
+  timesUsed   Int      @default(0)
+  isPublic    Boolean  @default(true)
+
+  // Мета-информация
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdBy   String?
+
+  @@index([category, level])
+}
+
+/// Настройки пользователя для работы с соревнованиями
+model UserCompetitionSettings {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+
+  // Предпочтения отображения
+  defaultView     String   @default("SCHEDULE")  // "LIST", "SCHEDULE", "CALENDAR"
+  autoExpandDates Boolean  @default(false)
+  showConflicts   Boolean  @default(true)
+
+  // Настройки по умолчанию
+  defaultBreakDuration Int  @default(300)  // 5 minutes
+  defaultTimePerPerformance Int @default(90) // 90 seconds
+
+  // Последние просмотренные
+  recentCompetitions String[] // Array of competition IDs
+
+  // Мета-информация
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
