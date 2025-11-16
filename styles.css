@@ -1088,6 +1088,189 @@ table tbody tr:last-child {
 }
 
 /* ==============================================
+   СОЗДАНИЕ СОРЕВНОВАНИЙ - MULTI-STEP FORM
+   ============================================== */
+
+.competition-steps {
+    margin-bottom: 32px;
+}
+
+.step-indicator {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: relative;
+    margin-bottom: 32px;
+}
+
+.step-indicator::before {
+    content: '';
+    position: absolute;
+    top: 20px;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: var(--ios-gray-5);
+    z-index: 0;
+}
+
+.step {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    flex: 1;
+    position: relative;
+    z-index: 1;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.step-number {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    background: var(--ios-bg-secondary);
+    border: 2px solid var(--ios-gray-4);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 600;
+    font-size: 17px;
+    color: var(--ios-text-secondary);
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.step-label {
+    font-size: 13px;
+    color: var(--ios-text-secondary);
+    text-align: center;
+    font-weight: 500;
+    transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.step.active .step-number {
+    background: var(--ios-blue);
+    border-color: var(--ios-blue);
+    color: white;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+}
+
+.step.active .step-label {
+    color: var(--ios-blue);
+    font-weight: 600;
+}
+
+.step.completed .step-number {
+    background: var(--ios-green);
+    border-color: var(--ios-green);
+    color: white;
+}
+
+.step.completed .step-number::before {
+    content: '✓';
+}
+
+.competition-step-content {
+    animation: fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.competition-step-content h4 {
+    color: var(--ios-text-primary);
+    font-size: 22px;
+    font-weight: 600;
+    margin-bottom: 24px;
+    letter-spacing: -0.4px;
+}
+
+/* Judge Card */
+.judge-card {
+    background: var(--ios-bg-primary);
+    border: 0.5px solid var(--ios-gray-5);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    animation: slideInFromRight 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.judge-card:hover {
+    border-color: var(--ios-blue);
+    transform: translateX(4px);
+}
+
+.judge-info {
+    flex: 1;
+}
+
+.judge-name {
+    font-size: 17px;
+    font-weight: 600;
+    color: var(--ios-text-primary);
+    margin-bottom: 4px;
+}
+
+.judge-details {
+    font-size: 13px;
+    color: var(--ios-text-secondary);
+}
+
+.judge-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.btn-icon {
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    border: none;
+    background: var(--ios-bg-secondary);
+    color: var(--ios-blue);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-icon:hover {
+    background: var(--ios-blue);
+    color: white;
+    transform: scale(1.1);
+}
+
+.btn-icon:active {
+    transform: scale(0.95);
+}
+
+.btn-icon.danger {
+    background: rgba(255, 59, 48, 0.1);
+    color: var(--ios-red);
+}
+
+.btn-icon.danger:hover {
+    background: var(--ios-red);
+    color: white;
+}
+
+/* Modal overlay */
+#competitionCreatorModal {
+    animation: fadeIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Logo preview */
+#logoPreview {
+    animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* ==============================================
    iOS UTILITY CLASSES
    ============================================== */
 

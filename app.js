@@ -363,6 +363,316 @@ function deleteParticipant(id) {
 // УПРАВЛЕНИЕ СОРЕВНОВАНИЯМИ
 // ==============================================
 
+// ==============================================
+// СОЗДАНИЕ СОРЕВНОВАНИЙ - MULTI-STEP FORM
+// ==============================================
+
+let currentCompetitionStep = 1;
+let tempCompetitionJudges = [];
+let tempCompetitionLogo = null;
+
+// Показать/скрыть форму создания соревнования
+function showCompetitionCreator() {
+    document.getElementById('competitionCreatorModal').style.display = 'block';
+    currentCompetitionStep = 1;
+    tempCompetitionJudges = [];
+    tempCompetitionLogo = null;
+    updateStepIndicator();
+}
+
+function closeCompetitionCreator() {
+    if (confirm('Вы уверены? Все несохраненные данные будут потеряны.')) {
+        document.getElementById('competitionCreatorModal').style.display = 'none';
+        document.getElementById('competitionForm').reset();
+        tempCompetitionJudges = [];
+        tempCompetitionLogo = null;
+    }
+}
+
+// Навигация по шагам
+function nextCompetitionStep(step) {
+    // Валидация текущего шага
+    if (!validateCurrentStep()) {
+        return;
+    }
+
+    currentCompetitionStep = step;
+    updateStepIndicator();
+    showStepContent(step);
+}
+
+function prevCompetitionStep(step) {
+    currentCompetitionStep = step;
+    updateStepIndicator();
+    showStepContent(step);
+}
+
+function updateStepIndicator() {
+    const steps = document.querySelectorAll('.step');
+    steps.forEach((step, index) => {
+        const stepNumber = index + 1;
+        step.classList.remove('active', 'completed');
+
+        if (stepNumber === currentCompetitionStep) {
+            step.classList.add('active');
+        } else if (stepNumber < currentCompetitionStep) {
+            step.classList.add('completed');
+        }
+    });
+}
+
+function showStepContent(step) {
+    const allContents = document.querySelectorAll('.competition-step-content');
+    allContents.forEach(content => {
+        content.style.display = 'none';
+    });
+
+    const currentContent = document.querySelector(`[data-step-content="${step}"]`);
+    if (currentContent) {
+        currentContent.style.display = 'block';
+    }
+}
+
+function validateCurrentStep() {
+    if (currentCompetitionStep === 1) {
+        const name = document.getElementById('competitionName').value;
+        const startDate = document.getElementById('competitionStartDate').value;
+        const endDate = document.getElementById('competitionEndDate').value;
+        const city = document.getElementById('competitionCity').value;
+        const venue = document.getElementById('competitionVenue').value;
+        const organizer = document.getElementById('competitionOrganizer').value;
+        const contactName = document.getElementById('competitionContactName').value;
+        const contactPhone = document.getElementById('competitionContactPhone').value;
+        const category = document.getElementById('competitionCategory').value;
+
+        if (!name || !startDate || !endDate || !city || !venue || !organizer || !contactName || !contactPhone || !category) {
+            alert('Пожалуйста, заполните все обязательные поля!');
+            return false;
+        }
+
+        const checkboxes = document.querySelectorAll('input[name="discipline"]:checked');
+        if (checkboxes.length === 0) {
+            alert('Выберите хотя бы одну дисциплину!');
+            return false;
+        }
+    }
+
+    return true;
+}
+
+// Автоматический расчет количества дней
+document.addEventListener('DOMContentLoaded', function() {
+    const startDateInput = document.getElementById('competitionStartDate');
+    const endDateInput = document.getElementById('competitionEndDate');
+    const daysInput = document.getElementById('competitionDays');
+
+    function calculateDays() {
+        if (startDateInput && endDateInput && startDateInput.value && endDateInput.value) {
+            const start = new Date(startDateInput.value);
+            const end = new Date(endDateInput.value);
+            const diffTime = end - start;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+            if (diffDays > 0) {
+                daysInput.value = diffDays;
+            } else {
+                alert('Дата окончания должна быть позже даты начала!');
+                endDateInput.value = '';
+            }
+        }
+    }
+
+    if (startDateInput && endDateInput) {
+        startDateInput.addEventListener('change', calculateDays);
+        endDateInput.addEventListener('change', calculateDays);
+    }
+});
+
+// ==============================================
+// УПРАВЛЕНИЕ СУДЕЙСКОЙ БРИГАДОЙ
+// ==============================================
+
+function addJudge() {
+    const judgeName = prompt('Введите ФИО судьи:');
+    if (!judgeName) return;
+
+    const judgeCity = prompt('Город:');
+    if (!judgeCity) return;
+
+    const judgeRegion = prompt('Область:');
+    if (!judgeRegion) return;
+
+    const judgeCategory = prompt('Судейская категория (например: 1 категория, Всероссийская):');
+    if (!judgeCategory) return;
+
+    const judgeTitle = prompt('Звание (например: МС, МСМК, или оставьте пустым):') || 'Нет';
+
+    const judge = {
+        id: Date.now(),
+        name: judgeName,
+        city: judgeCity,
+        region: judgeRegion,
+        category: judgeCategory,
+        title: judgeTitle,
+        brigade: null  // Будет назначена позже
+    };
+
+    tempCompetitionJudges.push(judge);
+    displayJudgesList();
+}
+
+function editJudge(id) {
+    const judge = tempCompetitionJudges.find(j => j.id === id);
+    if (!judge) return;
+
+    const newName = prompt('ФИО судьи:', judge.name);
+    if (!newName) return;
+
+    const newCity = prompt('Город:', judge.city);
+    if (!newCity) return;
+
+    const newRegion = prompt('Область:', judge.region);
+    if (!newRegion) return;
+
+    const newCategory = prompt('Судейская категория:', judge.category);
+    if (!newCategory) return;
+
+    const newTitle = prompt('Звание:', judge.title);
+
+    judge.name = newName;
+    judge.city = newCity;
+    judge.region = newRegion;
+    judge.category = newCategory;
+    judge.title = newTitle || 'Нет';
+
+    displayJudgesList();
+}
+
+function deleteJudge(id) {
+    if (confirm('Удалить судью?')) {
+        tempCompetitionJudges = tempCompetitionJudges.filter(j => j.id !== id);
+        displayJudgesList();
+    }
+}
+
+function moveJudgeUp(id) {
+    const index = tempCompetitionJudges.findIndex(j => j.id === id);
+    if (index > 0) {
+        [tempCompetitionJudges[index - 1], tempCompetitionJudges[index]] =
+        [tempCompetitionJudges[index], tempCompetitionJudges[index - 1]];
+        displayJudgesList();
+    }
+}
+
+function moveJudgeDown(id) {
+    const index = tempCompetitionJudges.findIndex(j => j.id === id);
+    if (index < tempCompetitionJudges.length - 1) {
+        [tempCompetitionJudges[index], tempCompetitionJudges[index + 1]] =
+        [tempCompetitionJudges[index + 1], tempCompetitionJudges[index]];
+        displayJudgesList();
+    }
+}
+
+function displayJudgesList() {
+    const container = document.getElementById('judgesList');
+
+    if (tempCompetitionJudges.length === 0) {
+        container.innerHTML = `
+            <div class="empty-state">
+                <div class="empty-state-icon">👨‍⚖️</div>
+                <p>Нет добавленных судей</p>
+            </div>
+        `;
+        return;
+    }
+
+    container.innerHTML = tempCompetitionJudges.map((judge, index) => `
+        <div class="judge-card">
+            <div class="judge-info">
+                <div class="judge-name">${judge.name}</div>
+                <div class="judge-details">
+                    ${judge.city}, ${judge.region} • ${judge.category} • ${judge.title}
+                    ${judge.brigade ? ` • Бригада: ${judge.brigade}` : ''}
+                </div>
+            </div>
+            <div class="judge-actions">
+                <button class="btn-icon" onclick="moveJudgeUp(${judge.id})" ${index === 0 ? 'disabled' : ''} title="Сдвиг вверх">↑</button>
+                <button class="btn-icon" onclick="moveJudgeDown(${judge.id})" ${index === tempCompetitionJudges.length - 1 ? 'disabled' : ''} title="Сдвиг вниз">↓</button>
+                <button class="btn-icon" onclick="editJudge(${judge.id})" title="Редактировать">✎</button>
+                <button class="btn-icon danger" onclick="deleteJudge(${judge.id})" title="Удалить">✕</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+function formBrigades() {
+    if (tempCompetitionJudges.length < 3) {
+        alert('Добавьте хотя бы 3 судей для формирования бригад');
+        return;
+    }
+
+    // Простое распределение по бригадам
+    const brigades = ['D', 'E', 'A'];
+    tempCompetitionJudges.forEach((judge, index) => {
+        judge.brigade = brigades[index % brigades.length];
+    });
+
+    displayJudgesList();
+    alert('Судьи распределены по бригадам D, E, A');
+}
+
+// Заглушки для Excel импорта/экспорта (требуется библиотека)
+function importJudgesFromExcel() {
+    alert('Функция импорта из Excel будет реализована в следующей версии.\n\nФормат Excel файла:\nФИО | Город | Область | Категория | Звание');
+}
+
+function exportJudgesToExcel() {
+    if (tempCompetitionJudges.length === 0) {
+        alert('Нет судей для экспорта');
+        return;
+    }
+
+    alert('Функция экспорта в Excel будет реализована в следующей версии.');
+}
+
+// ==============================================
+// ЛОГОТИП ТУРНИРА
+// ==============================================
+
+function previewLogo(event) {
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    // Проверка размера (макс 2 МБ)
+    if (file.size > 2 * 1024 * 1024) {
+        alert('Размер файла не должен превышать 2 МБ');
+        event.target.value = '';
+        return;
+    }
+
+    // Проверка типа
+    if (!['image/png', 'image/jpeg', 'image/svg+xml'].includes(file.type)) {
+        alert('Поддерживаются только PNG, JPG и SVG файлы');
+        event.target.value = '';
+        return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        tempCompetitionLogo = e.target.result;
+        document.getElementById('logoPreviewImage').src = e.target.result;
+        document.getElementById('logoPreview').style.display = 'block';
+    };
+    reader.readAsDataURL(file);
+}
+
+function removeLogo() {
+    tempCompetitionLogo = null;
+    document.getElementById('competitionLogo').value = '';
+    document.getElementById('logoPreview').style.display = 'none';
+}
+
 // Форма создания соревнования
 document.getElementById('competitionForm').addEventListener('submit', (e) => {
     e.preventDefault();
@@ -378,9 +688,25 @@ document.getElementById('competitionForm').addEventListener('submit', (e) => {
     const competition = {
         id: Date.now(),
         name: document.getElementById('competitionName').value,
-        date: document.getElementById('competitionDate').value,
+        startDate: document.getElementById('competitionStartDate').value,
+        endDate: document.getElementById('competitionEndDate').value,
+        days: parseInt(document.getElementById('competitionDays').value),
+        city: document.getElementById('competitionCity').value,
+        venue: document.getElementById('competitionVenue').value,
+        organizer: document.getElementById('competitionOrganizer').value,
+        contactName: document.getElementById('competitionContactName').value,
+        contactPhone: document.getElementById('competitionContactPhone').value,
         category: document.getElementById('competitionCategory').value,
-        disciplines: selectedDisciplines
+        disciplines: selectedDisciplines,
+        judges: [...tempCompetitionJudges],
+        logo: tempCompetitionLogo,
+        rankingSettings: {
+            tiebreakRule: document.querySelector('input[name="tiebreakRule"]:checked').value,
+            rankingSkip: document.querySelector('input[name="rankingSkip"]:checked').value,
+            dCalculation: document.querySelector('input[name="dCalculation"]:checked').value
+        },
+        // Для обратной совместимости
+        date: document.getElementById('competitionStartDate').value
     };
 
     competitions.push(competition);
@@ -388,8 +714,11 @@ document.getElementById('competitionForm').addEventListener('submit', (e) => {
     displayCompetitions();
     updateCompetitionSelects();
 
-    // Очистить форму
+    // Закрыть форму и очистить
+    document.getElementById('competitionCreatorModal').style.display = 'none';
     e.target.reset();
+    tempCompetitionJudges = [];
+    tempCompetitionLogo = null;
 
     alert('Соревнование успешно создано!');
 });
@@ -407,17 +736,38 @@ function displayCompetitions() {
         return;
     }
 
-    container.innerHTML = competitions.map(c => `
-        <div class="card">
-            <div class="card-header">
-                <h4>${c.name}</h4>
-                <button class="btn btn-danger" onclick="deleteCompetition(${c.id})">Удалить</button>
+    container.innerHTML = competitions.map(c => {
+        const startDate = c.startDate ? new Date(c.startDate).toLocaleDateString('ru-RU') : new Date(c.date).toLocaleDateString('ru-RU');
+        const endDate = c.endDate ? new Date(c.endDate).toLocaleDateString('ru-RU') : '';
+        const dateRange = endDate ? `${startDate} - ${endDate}` : startDate;
+
+        return `
+            <div class="card">
+                ${c.logo ? `<div style="text-align: center; margin-bottom: 12px;"><img src="${c.logo}" style="max-width: 80px; max-height: 80px; border-radius: 8px;"></div>` : ''}
+                <div class="card-header">
+                    <h4>${c.name}</h4>
+                    <button class="btn btn-danger" onclick="deleteCompetition(${c.id})">Удалить</button>
+                </div>
+                <p><strong>📅 Дата:</strong> ${dateRange} ${c.days ? `(${c.days} ${c.days === 1 ? 'день' : c.days < 5 ? 'дня' : 'дней'})` : ''}</p>
+                ${c.city ? `<p><strong>📍 Место:</strong> ${c.city}${c.venue ? `, ${c.venue}` : ''}</p>` : ''}
+                ${c.organizer ? `<p><strong>👔 Организатор:</strong> ${c.organizer}</p>` : ''}
+                ${c.contactName ? `<p><strong>📞 Контакт:</strong> ${c.contactName}${c.contactPhone ? `, ${c.contactPhone}` : ''}</p>` : ''}
+                <p><span class="badge badge-${c.category}">${categoryNames[c.category] || c.category}</span></p>
+                <p><strong>Дисциплины:</strong> ${c.disciplines.map(d => disciplineNames[d]).join(', ')}</p>
+                ${c.judges && c.judges.length > 0 ? `<p><strong>👨‍⚖️ Судей:</strong> ${c.judges.length}</p>` : ''}
+                ${c.rankingSettings ? `
+                    <details style="margin-top: 12px;">
+                        <summary style="cursor: pointer; color: var(--ios-blue); font-weight: 600;">Настройки ранжирования</summary>
+                        <div style="margin-top: 8px; padding: 12px; background: var(--ios-bg-secondary); border-radius: 8px; font-size: 14px;">
+                            <p><strong>При совпадении оценок:</strong> ${c.rankingSettings.tiebreakRule === 'share' ? 'Делить место' : 'Проверять компоненты (E>A>D)'}</p>
+                            <p><strong>Следующее место:</strong> ${c.rankingSettings.rankingSkip === 'no-skip' ? 'Не пропускать (1-1-2)' : 'Пропускать (1-1-3)'}</p>
+                            <p><strong>Расчет D:</strong> ${c.rankingSettings.dCalculation === 'russian' ? 'Российское правило' : 'Сумма бригад'}</p>
+                        </div>
+                    </details>
+                ` : ''}
             </div>
-            <p><strong>Дата:</strong> ${new Date(c.date).toLocaleDateString('ru-RU')}</p>
-            <p><span class="badge badge-${c.category}">${categoryNames[c.category]}</span></p>
-            <p><strong>Дисциплины:</strong> ${c.disciplines.map(d => disciplineNames[d]).join(', ')}</p>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 function deleteCompetition(id) {
@@ -792,6 +1142,162 @@ function deleteScore(id) {
 }
 
 // ==============================================
+// МОДУЛЬ РАНЖИРОВАНИЯ РЕЗУЛЬТАТОВ
+// ==============================================
+
+/**
+ * Функция ранжирования результатов с учетом настроек соревнования
+ * @param {Array} results - Массив результатов участников
+ * @param {Object} rankingSettings - Настройки ранжирования из соревнования
+ * @returns {Array} - Массив результатов с присвоенными местами
+ */
+function rankResults(results, rankingSettings) {
+    if (!results || results.length === 0) {
+        return [];
+    }
+
+    // Сортировка по общему баллу (от большего к меньшему)
+    const sortedResults = [...results].sort((a, b) => b.totalScore - a.totalScore);
+
+    // Если нет настроек, используем дефолтные
+    const settings = rankingSettings || {
+        tiebreakRule: 'share',
+        rankingSkip: 'no-skip'
+    };
+
+    let currentRank = 1;
+    let sameScoreCount = 0;
+
+    sortedResults.forEach((result, index) => {
+        if (index === 0) {
+            // Первый участник всегда получает место 1
+            result.rank = currentRank;
+        } else {
+            const prevResult = sortedResults[index - 1];
+
+            // Проверка на совпадение оценок
+            if (Math.abs(result.totalScore - prevResult.totalScore) < 0.001) {
+                // Оценки совпадают
+                if (settings.tiebreakRule === 'components') {
+                    // Проверяем компоненты E > A > D
+                    const comparison = compareComponents(result, prevResult);
+
+                    if (comparison === 0) {
+                        // Компоненты тоже совпадают - делим место
+                        result.rank = prevResult.rank;
+                        sameScoreCount++;
+                    } else if (comparison > 0) {
+                        // Текущий результат лучше - присваиваем следующее место
+                        if (settings.rankingSkip === 'skip') {
+                            currentRank = index + 1;
+                        } else {
+                            currentRank = prevResult.rank + 1;
+                        }
+                        result.rank = currentRank;
+                        sameScoreCount = 0;
+                    } else {
+                        // Текущий результат хуже - делим место
+                        result.rank = prevResult.rank;
+                        sameScoreCount++;
+                    }
+                } else {
+                    // Просто делим место
+                    result.rank = prevResult.rank;
+                    sameScoreCount++;
+                }
+            } else {
+                // Оценки разные
+                if (settings.rankingSkip === 'skip' && sameScoreCount > 0) {
+                    // Пропускаем позиции
+                    currentRank = index + 1;
+                } else {
+                    // Не пропускаем позиции
+                    currentRank = prevResult.rank + sameScoreCount + 1;
+                }
+                result.rank = currentRank;
+                sameScoreCount = 0;
+            }
+        }
+    });
+
+    return sortedResults;
+}
+
+/**
+ * Сравнение компонентов оценок (E > A > D)
+ * @returns {number} - 0 если равны, >0 если a лучше, <0 если b лучше
+ */
+function compareComponents(a, b) {
+    // Получаем средние оценки по компонентам для всех выступлений участника
+    const aAvg = calculateAverageComponents(a.scores);
+    const bAvg = calculateAverageComponents(b.scores);
+
+    // Сравниваем E (Execution) - больше = лучше
+    if (Math.abs(aAvg.E - bAvg.E) > 0.001) {
+        return aAvg.E - bAvg.E;
+    }
+
+    // Если E равны, сравниваем A (Artistry) - больше = лучше
+    if (Math.abs(aAvg.A - bAvg.A) > 0.001) {
+        return aAvg.A - bAvg.A;
+    }
+
+    // Если A равны, сравниваем D (Difficulty) - больше = лучше
+    if (Math.abs(aAvg.D - bAvg.D) > 0.001) {
+        return aAvg.D - bAvg.D;
+    }
+
+    // Все компоненты равны
+    return 0;
+}
+
+/**
+ * Расчет средних значений компонентов
+ */
+function calculateAverageComponents(scores) {
+    if (!scores || scores.length === 0) {
+        return { D: 0, E: 0, A: 0 };
+    }
+
+    const totals = scores.reduce((acc, score) => {
+        acc.D += (score.dScore || 0);
+        acc.E += (score.eScore || 0);
+        acc.A += (score.aScore || 0);
+        return acc;
+    }, { D: 0, E: 0, A: 0 });
+
+    return {
+        D: totals.D / scores.length,
+        E: totals.E / scores.length,
+        A: totals.A / scores.length
+    };
+}
+
+/**
+ * Расчет D-оценки с учетом настроек соревнования
+ * @param {Object} scores - Объект с оценками DB и DA
+ * @param {Object} competition - Объект соревнования с настройками
+ * @returns {number} - Итоговая D-оценка
+ */
+function calculateDScore(scores, competition) {
+    const { db1 = 0, db2 = 0, db3 = 0, db4 = 0, da1 = 0, da2 = 0, da3 = 0, da4 = 0 } = scores;
+
+    const dbAvg = (db1 + db2) / 2;
+    const daAvg = (da1 + da2) / 2;
+
+    // Проверяем настройки соревнования
+    if (competition && competition.rankingSettings) {
+        if (competition.rankingSettings.dCalculation === 'sum') {
+            // Сумма двух бригад: (DB1+DB2) + (DA1+DA2)
+            return (db1 + db2) + (da1 + da2);
+        }
+    }
+
+    // Российское правило (по умолчанию): ((DB1+DB2) + (DA1+DA2)) / 2
+    return (dbAvg + daAvg);
+}
+
+// ==============================================
 // РЕЗУЛЬТАТЫ И ТАБЛИЦА ЛИДЕРОВ
 // ==============================================
 
@@ -841,14 +1347,17 @@ function loadResults() {
         participantResults[score.participantId].totalScore += score.total;
     });
 
-    // Преобразовать в массив и отсортировать по общей сумме баллов
-    const resultsArray = Object.values(participantResults).sort((a, b) => b.totalScore - a.totalScore);
+    // Преобразовать в массив
+    const resultsArray = Object.values(participantResults);
+
+    // Применить ранжирование с учетом настроек соревнования
+    const rankedResults = rankResults(resultsArray, competition.rankingSettings);
 
     // Отобразить таблицу результатов
-    displayResultsTable(resultsArray, competition);
+    displayResultsTable(rankedResults, competition);
 
     // Отобразить подиум победителей
-    displayWinnersPodium(resultsArray);
+    displayWinnersPodium(rankedResults);
 }
 
 function displayResultsTable(results, competition) {
@@ -869,7 +1378,7 @@ function displayResultsTable(results, competition) {
     `;
 
     results.forEach((result, index) => {
-        const rank = index + 1;
+        const rank = result.rank || (index + 1);
         const rankClass = rank <= 3 ? `rank-${rank}` : '';
 
         tableHTML += `

@@ -133,38 +133,223 @@
         <!-- Вкладка: Соревнования -->
         <div id="competitions" class="tab-content">
             <h2>Управление соревнованиями</h2>
-            <form id="competitionForm" class="form-card">
-                <div class="form-group">
-                    <label for="competitionName">Название соревнования:</label>
-                    <input type="text" id="competitionName" required>
-                </div>
-                <div class="form-group">
-                    <label for="competitionDate">Дата проведения:</label>
-                    <input type="date" id="competitionDate" required>
-                </div>
-                <div class="form-group">
-                    <label for="competitionCategory">Категория участников:</label>
-                    <select id="competitionCategory" required>
-                        <option value="">Выберите категорию</option>
-                        <option value="junior">Юниоры (до 12 лет)</option>
-                        <option value="youth">Молодежь (13-15 лет)</option>
-                        <option value="senior">Взрослые (16+ лет)</option>
-                    </select>
-                </div>
-                <div class="form-group">
-                    <label>Дисциплины:</label>
-                    <div class="checkbox-group">
-                        <label><input type="checkbox" name="discipline" value="rope"> Скакалка</label>
-                        <label><input type="checkbox" name="discipline" value="hoop"> Обруч</label>
-                        <label><input type="checkbox" name="discipline" value="ball"> Мяч</label>
-                        <label><input type="checkbox" name="discipline" value="clubs"> Булавы</label>
-                        <label><input type="checkbox" name="discipline" value="ribbon"> Лента</label>
-                        <label><input type="checkbox" name="discipline" value="free"> Без предмета</label>
-                    </div>
-                </div>
-                <button type="submit" class="btn btn-primary">Создать соревнование</button>
-            </form>
 
+            <!-- Кнопка создания нового соревнования -->
+            <button class="btn btn-primary" onclick="showCompetitionCreator()" style="margin-bottom: 20px;">
+                ➕ Создать новое соревнование
+            </button>
+
+            <!-- Модальное окно создания соревнования -->
+            <div id="competitionCreatorModal" style="display: none;">
+                <div class="form-card">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="margin: 0;">Создание соревнования</h3>
+                        <button class="btn btn-secondary btn-sm" onclick="closeCompetitionCreator()">Закрыть</button>
+                    </div>
+
+                    <!-- Навигация по шагам -->
+                    <div class="competition-steps">
+                        <div class="step-indicator">
+                            <div class="step active" data-step="1">
+                                <span class="step-number">1</span>
+                                <span class="step-label">Общая информация</span>
+                            </div>
+                            <div class="step" data-step="2">
+                                <span class="step-number">2</span>
+                                <span class="step-label">Судейская бригада</span>
+                            </div>
+                            <div class="step" data-step="3">
+                                <span class="step-number">3</span>
+                                <span class="step-label">Логотип</span>
+                            </div>
+                            <div class="step" data-step="4">
+                                <span class="step-number">4</span>
+                                <span class="step-label">Настройки ранжирования</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <form id="competitionForm">
+                        <!-- Шаг 1: Общая информация -->
+                        <div class="competition-step-content" data-step-content="1">
+                            <h4>Общая информация</h4>
+
+                            <div class="form-group">
+                                <label for="competitionName">Название соревнований:</label>
+                                <input type="text" id="competitionName" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="competitionStartDate">Дата начала:</label>
+                                <input type="date" id="competitionStartDate" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="competitionEndDate">Дата окончания:</label>
+                                <input type="date" id="competitionEndDate" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="competitionDays">Количество дней:</label>
+                                <input type="number" id="competitionDays" min="1" value="1" readonly>
+                                <small>Рассчитывается автоматически на основе дат</small>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="competitionCity">Город:</label>
+                                <input type="text" id="competitionCity" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="competitionVenue">Место проведения / Адрес:</label>
+                                <textarea id="competitionVenue" rows="2" required style="width: 100%; padding: 11px 15px; border: 0.5px solid var(--ios-gray-4); border-radius: 10px; font-size: 17px; background: var(--ios-bg-primary); font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Text', sans-serif;"></textarea>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="competitionOrganizer">Организатор соревнований:</label>
+                                <input type="text" id="competitionOrganizer" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="competitionContactName">Контактное лицо (ФИО):</label>
+                                <input type="text" id="competitionContactName" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="competitionContactPhone">Номер телефона:</label>
+                                <input type="tel" id="competitionContactPhone" required placeholder="+7 (___) ___-__-__">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="competitionCategory">Категория участников:</label>
+                                <select id="competitionCategory" required>
+                                    <option value="">Выберите категорию</option>
+                                    <option value="junior">Юниоры (до 12 лет)</option>
+                                    <option value="youth">Молодежь (13-15 лет)</option>
+                                    <option value="senior">Взрослые (16+ лет)</option>
+                                    <option value="mixed">Смешанная категория</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Дисциплины:</label>
+                                <div class="checkbox-group">
+                                    <label><input type="checkbox" name="discipline" value="rope"> Скакалка</label>
+                                    <label><input type="checkbox" name="discipline" value="hoop"> Обруч</label>
+                                    <label><input type="checkbox" name="discipline" value="ball"> Мяч</label>
+                                    <label><input type="checkbox" name="discipline" value="clubs"> Булавы</label>
+                                    <label><input type="checkbox" name="discipline" value="ribbon"> Лента</label>
+                                    <label><input type="checkbox" name="discipline" value="free"> Без предмета</label>
+                                </div>
+                            </div>
+
+                            <button type="button" class="btn btn-primary" onclick="nextCompetitionStep(2)">Далее →</button>
+                        </div>
+
+                        <!-- Шаг 2: Судейская бригада -->
+                        <div class="competition-step-content" data-step-content="2" style="display: none;">
+                            <h4>Судейская бригада</h4>
+
+                            <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap;">
+                                <button type="button" class="btn btn-primary" onclick="addJudge()">➕ Добавить судью</button>
+                                <button type="button" class="btn btn-secondary" onclick="importJudgesFromExcel()">📥 Загрузить из Excel</button>
+                                <button type="button" class="btn btn-secondary" onclick="exportJudgesToExcel()">📤 Выгрузить в Excel</button>
+                                <button type="button" class="btn btn-secondary" onclick="formBrigades()">👥 Формировать бригады</button>
+                            </div>
+
+                            <div id="judgesList">
+                                <div class="empty-state">
+                                    <div class="empty-state-icon">👨‍⚖️</div>
+                                    <p>Нет добавленных судей</p>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                                <button type="button" class="btn btn-secondary" onclick="prevCompetitionStep(1)">← Назад</button>
+                                <button type="button" class="btn btn-primary" onclick="nextCompetitionStep(3)">Далее →</button>
+                            </div>
+                        </div>
+
+                        <!-- Шаг 3: Логотип турнира -->
+                        <div class="competition-step-content" data-step-content="3" style="display: none;">
+                            <h4>Логотип турнира</h4>
+
+                            <div class="form-group">
+                                <label for="competitionLogo">Загрузить логотип (PNG, JPG, SVG):</label>
+                                <input type="file" id="competitionLogo" accept="image/png,image/jpeg,image/svg+xml" onchange="previewLogo(event)">
+                                <small>Рекомендуемый размер: 512x512 px. Максимальный размер файла: 2 МБ</small>
+                            </div>
+
+                            <div id="logoPreview" style="margin-top: 20px; display: none;">
+                                <label>Предпросмотр:</label>
+                                <div style="border: 0.5px solid var(--ios-gray-4); border-radius: 16px; padding: 20px; text-align: center; background: var(--ios-bg-secondary);">
+                                    <img id="logoPreviewImage" style="max-width: 200px; max-height: 200px; border-radius: 12px;">
+                                </div>
+                                <button type="button" class="btn btn-danger btn-sm" onclick="removeLogo()" style="margin-top: 12px;">Удалить логотип</button>
+                            </div>
+
+                            <div style="display: flex; gap: 12px; margin-top: 20px;">
+                                <button type="button" class="btn btn-secondary" onclick="prevCompetitionStep(2)">← Назад</button>
+                                <button type="button" class="btn btn-primary" onclick="nextCompetitionStep(4)">Далее →</button>
+                            </div>
+                        </div>
+
+                        <!-- Шаг 4: Настройки ранжирования -->
+                        <div class="competition-step-content" data-step-content="4" style="display: none;">
+                            <h4>Настройки ранжирования результатов</h4>
+
+                            <div class="form-group">
+                                <label>Распределение мест при совпадении оценок:</label>
+                                <div style="margin-top: 10px;">
+                                    <label style="display: block; margin-bottom: 8px;">
+                                        <input type="radio" name="tiebreakRule" value="share" checked>
+                                        Делить место (не проверять компоненты)
+                                    </label>
+                                    <label style="display: block;">
+                                        <input type="radio" name="tiebreakRule" value="components">
+                                        Проверять компоненты (E > A > D)
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Следующее место после совпадений:</label>
+                                <div style="margin-top: 10px;">
+                                    <label style="display: block; margin-bottom: 8px;">
+                                        <input type="radio" name="rankingSkip" value="no-skip" checked>
+                                        Не пропускать позицию (пример: 1-1-2)
+                                    </label>
+                                    <label style="display: block;">
+                                        <input type="radio" name="rankingSkip" value="skip">
+                                        Пропускать позицию (пример: 1-1-3)
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Расчёт оценки D для упражнений БП (индивидуальная программа):</label>
+                                <div style="margin-top: 10px;">
+                                    <label style="display: block; margin-bottom: 8px;">
+                                        <input type="radio" name="dCalculation" value="russian" checked>
+                                        Российское правило: (DB1+DB2 + DB3+DB4) / 2
+                                    </label>
+                                    <label style="display: block;">
+                                        <input type="radio" name="dCalculation" value="sum">
+                                        Сумма двух бригад: (DB1+DB2) + (DB3+DB4)
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 12px; margin-top: 30px;">
+                                <button type="button" class="btn btn-secondary" onclick="prevCompetitionStep(3)">← Назад</button>
+                                <button type="submit" class="btn btn-primary">✅ Создать соревнование</button>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Список существующих соревнований -->
             <div class="competitions-list">
                 <h3>Активные соревнования</h3>
                 <div id="competitionsList"></div>
