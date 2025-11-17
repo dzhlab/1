@@ -1,0 +1,598 @@
+// Prisma Schema для платформы соревнований по художественной гимнастике
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// ENUMS
+// ============================================
+
+enum UserRole {
+  ADMIN
+  ORGANIZER
+  CHIEF_JUDGE
+  SECRETARY
+  TECHNICAL_SPECIALIST
+  JUDGE_D
+  JUDGE_E
+  JUDGE_A
+  COORDINATOR
+  VIEWER
+}
+
+enum Category {
+  JUNIOR           // Юниоры
+  YOUTH            // Молодежь
+  SENIOR           // Взрослые
+  MIXED            // Смешанная
+}
+
+enum AgeGroup {
+  AGE_5_AND_UNDER  // 5 лет и младше
+  AGE_6_7          // 6-7 лет
+  AGE_8            // 8 лет
+  AGE_9            // 9 лет
+  AGE_10           // 10 лет
+  AGE_11_12        // 11-12 лет
+  AGE_13_15        // 13-15 лет
+  AGE_15_PLUS      // 15 лет и старше
+}
+
+enum Rank {
+  THIRD_JUNIOR     // 3 юношеский
+  SECOND_JUNIOR    // 2 юношеский
+  FIRST_JUNIOR     // 1 юношеский
+  THIRD_SPORT      // 3 спортивный
+  SECOND_SPORT     // 2 спортивный
+  FIRST_SPORT      // 1 спортивный
+  CMS              // КМС
+  MS               // МС
+  MS_INTERNATIONAL // МСМК
+}
+
+enum Discipline {
+  ROPE      // Скакалка
+  HOOP      // Обруч
+  BALL      // Мяч
+  CLUBS     // Булавы
+  RIBBON    // Лента
+  FREE      // Без предмета
+}
+
+enum PerformanceType {
+  INDIVIDUAL         // Индивидуальное
+  GROUP_5_PLUS       // Групповое (5+ гимнасток)
+  PAIR               // Двойка
+  TRIO               // Тройка
+}
+
+enum Brigade {
+  D         // Difficulty (Трудность)
+  E         // Execution (Исполнение)
+  A         // Artistry (Артистизм)
+}
+
+enum JudgeRole {
+  // D-Panel (Body Difficulty + Apparatus Difficulty)
+  D1
+  D2
+  D3
+  D4
+
+  // E-Panel (Execution)
+  E1
+  E2
+  E3
+  E4
+
+  // A-Panel (Artistry)
+  A1
+  A2
+  A3
+  A4
+
+  // Technical
+  LINE_JUDGE
+  TIME_JUDGE
+  CHIEF_JUDGE
+  COORDINATOR
+}
+
+enum JudgePanelType {
+  D_PANEL          // Difficulty panel
+  E_PANEL          // Execution panel
+  A_PANEL          // Artistry panel
+  TECHNICAL        // Line, Time judges
+  CHIEF            // Chief judge
+}
+
+enum TiebreakRule {
+  SHARE          // Делить место при совпадении
+  COMPONENTS     // Проверять компоненты E>A>D
+}
+
+enum RankingSkip {
+  NO_SKIP        // Не пропускать позицию (1-1-2)
+  SKIP           // Пропускать позицию (1-1-3)
+}
+
+enum DCalculation {
+  RUSSIAN        // ((DB1+DB2)+(DA1+DA2))/2
+  SUM            // (DB1+DB2)+(DA1+DA2)
+}
+
+enum JudgeCategory {
+  THIRD           // 3 категория
+  SECOND          // 2 категория
+  FIRST           // 1 категория
+  ALL_RUSSIAN     // Всероссийская
+  INTERNATIONAL   // Международная
+}
+
+enum CompetitionStatus {
+  DRAFT
+  PUBLISHED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum EventType {
+  OPENING          // Открытие
+  BREAK            // Перерыв
+  PARADE           // Парад
+  AWARDS           // Награждение
+  EXHIBITION       // Показательное выступление
+  OTHER            // Другое
+  JUDGES_MEETING   // Совещание судей
+  ARRIVAL_DEPARTURE // Приезд/отъезд
+  FLOOR_PRACTICE   // Опробование площадки
+}
+
+enum DrawStrategy {
+  RANDOM           // Случайная жеребьёвка
+  BY_CLUB          // По клубам
+  SNAKE            // Змейка
+  REVERSE_SNAKE    // Обратная змейка
+}
+
+// ============================================
+// ОСНОВНЫЕ ТАБЛИЦЫ
+// ============================================
+
+model User {
+  id              String      @id @default(cuid())
+  email           String      @unique
+  passwordHash    String
+  fullName        String
+  role            UserRole    @default(VIEWER)
+  isActive        Boolean     @default(true)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([email])
+  @@index([role])
+}
+
+model Competition {
+  id              String              @id @default(cuid())
+  name            String              @db.VarChar(500)
+  startDate       DateTime
+  endDate         DateTime
+  days            Int
+  city            String              @db.VarChar(200)
+  venue           String              @db.VarChar(500)
+  address         String?             @db.VarChar(1000)
+  organizer       String              @db.VarChar(500)
+  contactName     String              @db.VarChar(200)
+  contactPhone    String              @db.VarChar(50)
+  contactEmail    String?             @db.VarChar(200)
+  category        Category
+  description     String?             @db.Text
+  status          CompetitionStatus   @default(DRAFT)
+
+  // Логотип
+  logoUrl         String?
+  logoKey         String?             // S3/MinIO key для удаления
+
+  // Настройки ранжирования
+  tiebreakRule    TiebreakRule        @default(SHARE)
+  rankingSkip     RankingSkip         @default(NO_SKIP)
+  dCalculation    DCalculation        @default(RUSSIAN)
+
+  // Relations
+  disciplines     CompetitionDiscipline[]
+  judges          CompetitionJudge[]
+  participants    CompetitionParticipant[]
+  scores          Score[]
+  dates           CompetitionDate[]
+  groups          Group[]
+  brigades        JudgingBrigade[]
+  sessions        JudgingSession[]
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+  createdBy       String?
+
+  @@index([startDate, endDate])
+  @@index([city])
+  @@index([status])
+}
+
+model CompetitionDiscipline {
+  id              String      @id @default(cuid())
+  competitionId   String
+  discipline      Discipline
+  order           Int         @default(0)
+
+  competition     Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+
+  @@unique([competitionId, discipline])
+  @@index([competitionId, order])
+}
+
+model CompetitionDate {
+  id              String      @id @default(cuid())
+  competitionId   String
+  date            DateTime
+  startTime       String      // HH:MM
+  endTime         String?     // HH:MM рассчитывается автоматически
+  order           Int
+
+  competition     Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  events          DateEvent[]
+  groups          DateGroup[]
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([competitionId, order])
+  @@index([competitionId, date])
+}
+
+model DateEvent {
+  id              String      @id @default(cuid())
+  dateId          String
+  type            EventType
+  name            String      @db.VarChar(500)
+  description     String?     @db.Text
+  duration        Int         // В секундах
+  isFixedTime     Boolean     @default(false)
+  fixedStartTime  String?     // HH:MM
+  calculatedStartTime String? // HH:MM рассчитанное
+  calculatedEndTime   String? // HH:MM рассчитанное
+  order           Int
+
+  date            CompetitionDate @relation(fields: [dateId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([dateId, order])
+  @@index([dateId, type])
+}
+
+model DateGroup {
+  id              String      @id @default(cuid())
+  dateId          String
+  groupId         String
+  order           Int
+  calculatedStartTime String? // HH:MM
+  calculatedEndTime   String? // HH:MM
+
+  date            CompetitionDate @relation(fields: [dateId], references: [id], onDelete: Cascade)
+  group           Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([dateId, groupId])
+  @@index([dateId, order])
+}
+
+model Judge {
+  id              String              @id @default(cuid())
+  fullName        String              @db.VarChar(200)
+  city            String              @db.VarChar(200)
+  region          String              @db.VarChar(200)
+  category        JudgeCategory
+  title           String?             @db.VarChar(100) // МС, МСМК, ЗМС
+
+  // Relations
+  competitions    CompetitionJudge[]
+  brigadeAssignments JudgeInBrigade[]
+  scores          Score[]
+
+  createdAt       DateTime            @default(now())
+  updatedAt       DateTime            @updatedAt
+
+  @@index([fullName])
+  @@index([city])
+}
+
+model CompetitionJudge {
+  id              String      @id @default(cuid())
+  competitionId   String
+  judgeId         String
+  brigade         Brigade?    // D, E, A (опционально)
+  position        Int         // Порядок в списке (для сортировки)
+
+  competition     Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  judge           Judge       @relation(fields: [judgeId], references: [id], onDelete: Cascade)
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([competitionId, judgeId])
+  @@index([competitionId, brigade])
+  @@index([competitionId, position])
+}
+
+model Participant {
+  id              String      @id @default(cuid())
+  fullName        String      @db.VarChar(200)
+  dateOfBirth     DateTime?
+  age             Int
+  club            String      @db.VarChar(200)
+  city            String      @db.VarChar(200)
+  coach           String?     @db.VarChar(200)
+  rank            Rank?
+  category        Category
+
+  // Relations
+  competitions    CompetitionParticipant[]
+  scores          Score[]
+  groupAthletes   GroupAthlete[]
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@index([fullName])
+  @@index([club])
+  @@index([city])
+}
+
+model CompetitionParticipant {
+  id              String      @id @default(cuid())
+  competitionId   String
+  participantId   String
+
+  competition     Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  participant     Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+
+  @@unique([competitionId, participantId])
+  @@index([competitionId])
+}
+
+// ============================================
+// ГРУППЫ И ПОТОКИ
+// ============================================
+
+model Group {
+  id                    String            @id @default(cuid())
+  competitionId         String
+  name                  String            @db.VarChar(500)
+  ageGroup              AgeGroup?
+  rank                  Rank?
+  performanceType       PerformanceType   @default(INDIVIDUAL)
+  disciplines           Discipline[]
+  performanceDuration   Int               // Время одного выступления в секундах
+
+  competition           Competition       @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  athletes              GroupAthlete[]
+  streams               Stream[]
+  dateGroups            DateGroup[]
+  drawHistory           DrawHistory[]
+
+  createdAt             DateTime          @default(now())
+  updatedAt             DateTime          @updatedAt
+  createdBy             String?
+
+  @@index([competitionId])
+  @@index([competitionId, ageGroup])
+}
+
+model GroupAthlete {
+  id                String        @id @default(cuid())
+  groupId           String
+  participantId     String
+  orderNumber       Int
+  streamId          String?
+
+  group             Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  participant       Participant   @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  stream            Stream?       @relation(fields: [streamId], references: [id], onDelete: SetNull)
+
+  createdAt         DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+
+  @@unique([groupId, participantId])
+  @@index([groupId, orderNumber])
+  @@index([streamId])
+}
+
+model Stream {
+  id                String          @id @default(cuid())
+  groupId           String
+  name              String          @db.VarChar(200) // A, B, C или произвольное
+  number            Int
+  startTime         String?         @db.VarChar(10) // HH:MM
+  minAthletes       Int?
+  maxAthletes       Int?
+
+  group             Group           @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  athletes          GroupAthlete[]
+
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+
+  @@unique([groupId, number])
+  @@index([groupId])
+}
+
+model DrawHistory {
+  id                String        @id @default(cuid())
+  groupId           String
+  strategy          DrawStrategy
+  athletesCount     Int
+  result            Json          // Результат жеребьёвки
+  performedBy       String?
+  performedAt       DateTime      @default(now())
+
+  group             Group         @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@index([groupId, performedAt])
+}
+
+// ============================================
+// СУДЕЙСКИЕ БРИГАДЫ
+// ============================================
+
+model JudgingBrigade {
+  id                  String            @id @default(cuid())
+  competitionId       String?
+  name                String            @db.VarChar(200)
+  number              Int?
+  description         String?           @db.VarChar(500)
+  specializationType  String?           @db.VarChar(50)  // D_PANEL, E_PANEL, A_PANEL, MIXED
+  isActive            Boolean           @default(true)
+
+  competition         Competition?      @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  judges              JudgeInBrigade[]
+  sessions            JudgingSession[]
+
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  createdBy           String?
+
+  @@index([competitionId])
+  @@index([isActive])
+}
+
+model JudgeInBrigade {
+  id          String          @id @default(cuid())
+  brigadeId   String
+  judgeId     String?
+  judgeName   String          @db.VarChar(200)
+  judgeRole   JudgeRole
+  panelType   JudgePanelType
+  isPrimary   Boolean         @default(false)
+  isActive    Boolean         @default(true)
+
+  brigade     JudgingBrigade  @relation(fields: [brigadeId], references: [id], onDelete: Cascade)
+  judge       Judge?          @relation(fields: [judgeId], references: [id], onDelete: SetNull)
+
+  assignedAt  DateTime        @default(now())
+  assignedBy  String?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@unique([brigadeId, judgeRole])
+  @@index([brigadeId, panelType])
+  @@index([judgeId])
+}
+
+// ============================================
+// СУДЕЙСТВО И ОЦЕНКИ
+// ============================================
+
+model JudgingSession {
+  id                String            @id @default(cuid())
+  competitionId     String
+  brigadeId         String?
+  groupId           String?
+  streamId          String?
+  discipline        Discipline
+  status            String            @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED, PAUSED
+  currentAthleteId  String?
+  currentAthleteIndex Int?
+
+  competition       Competition       @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  brigade           JudgingBrigade?   @relation(fields: [brigadeId], references: [id], onDelete: SetNull)
+
+  startedAt         DateTime?
+  completedAt       DateTime?
+  startedBy         String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  @@index([competitionId, status])
+  @@index([brigadeId])
+}
+
+model Score {
+  id              String      @id @default(cuid())
+  competitionId   String
+  participantId   String
+  discipline      Discipline
+  judgeId         String?
+
+  // D-бригада: Трудность тела (DB)
+  db1             Decimal     @db.Decimal(5, 3) @default(0)
+  db2             Decimal     @db.Decimal(5, 3) @default(0)
+  db3             Decimal?    @db.Decimal(5, 3)
+  db4             Decimal?    @db.Decimal(5, 3)
+
+  // D-бригада: Трудность предмета (DA)
+  da1             Decimal     @db.Decimal(5, 3) @default(0)
+  da2             Decimal     @db.Decimal(5, 3) @default(0)
+  da3             Decimal?    @db.Decimal(5, 3)
+  da4             Decimal?    @db.Decimal(5, 3)
+
+  // E-бригада: Вычеты за исполнение (4 судьи)
+  e1              Decimal     @db.Decimal(5, 3) @default(0)
+  e2              Decimal     @db.Decimal(5, 3) @default(0)
+  e3              Decimal     @db.Decimal(5, 3) @default(0)
+  e4              Decimal     @db.Decimal(5, 3) @default(0)
+
+  // A-бригада: Артистизм (4 судьи)
+  a1              Decimal     @db.Decimal(5, 3) @default(0)
+  a2              Decimal     @db.Decimal(5, 3) @default(0)
+  a3              Decimal     @db.Decimal(5, 3) @default(0)
+  a4              Decimal     @db.Decimal(5, 3) @default(0)
+
+  // Штрафы
+  penalties       Decimal     @db.Decimal(5, 3) @default(0)
+
+  // Итоговые значения (рассчитываются)
+  dScore          Decimal     @db.Decimal(5, 3) @default(0)
+  eScore          Decimal     @db.Decimal(5, 3) @default(0)
+  aScore          Decimal     @db.Decimal(5, 3) @default(0)
+  totalScore      Decimal     @db.Decimal(5, 3) @default(0)
+
+  // Relations
+  competition     Competition @relation(fields: [competitionId], references: [id], onDelete: Cascade)
+  participant     Participant @relation(fields: [participantId], references: [id], onDelete: Cascade)
+  judge           Judge?      @relation(fields: [judgeId], references: [id])
+
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+
+  @@unique([competitionId, participantId, discipline])
+  @@index([competitionId, totalScore])
+  @@index([participantId])
+}
+
+// ============================================
+// AUDIT LOG
+// ============================================
+
+model AuditLog {
+  id              String      @id @default(cuid())
+  entityType      String      // Competition, Judge, Score, etc.
+  entityId        String
+  action          String      // CREATE, UPDATE, DELETE
+  userId          String?
+  changes         Json?       // Детали изменений
+  ipAddress       String?
+
+  createdAt       DateTime    @default(now())
+
+  @@index([entityType, entityId])
+  @@index([createdAt])
+  @@index([userId])
+}
